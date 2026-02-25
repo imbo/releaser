@@ -1,0 +1,75 @@
+{
+  "name": "imbo/releaser",
+  "type": "project",
+  "description": "CLI release helper for GitHub, generating releases, tags and release notes from Conventional Commits.",
+  "homepage": "https://imbo.io/",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Christer Edvartsen",
+      "email": "cogo@starzinger.net",
+      "homepage": "https://github.com/christeredvartsen"
+    },
+    {
+      "name": "Contributors",
+      "homepage": "https://github.com/imbo/releaser/graphs/contributors"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/imbo/releaser/issues",
+    "source": "https://github.com/imbo/releaser",
+    "docs": "https://docs.imbo.io"
+  },
+  "require": {
+    "php": ">=8.3",
+    "guzzlehttp/guzzle": "^7.10",
+    "phlak/semver": "^6.1",
+    "ramsey/conventional-commits": "^1.6",
+    "symfony/console": "^7.4",
+    "symfony/dotenv": "^7.4",
+    "symfony/process": "^7.4",
+    "twig/twig": "^3.23"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.93",
+    "imbo/imbo-coding-standard": "^3.0",
+    "phpstan/extension-installer": "^1.4",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-deprecation-rules": "^2.0",
+    "phpstan/phpstan-phpunit": "^2.0",
+    "phpstan/phpstan-symfony": "^2.0",
+    "phpunit/phpunit": "^12.5",
+    "symfony/var-dumper": "^7.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "ImboReleaser\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "ImboReleaser\\": "tests/"
+    }
+  },
+  "bin": [
+    "imbo-releaser"
+  ],
+  "scripts": {
+    "ci": [
+      "@cs",
+      "@sa",
+      "@test"
+    ],
+    "cs": "vendor/bin/php-cs-fixer check --diff",
+    "cs:fix": "vendor/bin/php-cs-fixer fix --diff",
+    "sa": "vendor/bin/phpstan analyse",
+    "test": "vendor/bin/phpunit",
+    "test:coverage": "vendor/bin/phpunit --coverage-html build/coverage"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "phpstan/extension-installer": true
+    }
+  }
+}

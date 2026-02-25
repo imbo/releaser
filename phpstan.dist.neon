@@ -1,0 +1,7 @@
+parameters:
+	level: 10
+	paths:
+		- scripts
+		- src
+		- tests
+		- imbo-releaser
