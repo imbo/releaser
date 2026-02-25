@@ -4,3 +4,42 @@
 declare(strict_types=1);
 
 namespace ImboReleaser;
+
+use GuzzleHttp\Client as GuzzleHttpClient;
+use ImboReleaser\Console\Application;
+use ImboReleaser\GitHub\Client;
+use ImboReleaser\GitHub\TokenResolver;
+use RuntimeException;
+use Throwable;
+
+use function fwrite;
+use function sprintf;
+
+use const PHP_EOL;
+use const STDERR;
+
+require __DIR__.'/vendor/autoload.php';
+
+try {
+    $token = (new TokenResolver())->getGitHubToken();
+    if (null === $token) {
+        throw new RuntimeException('Failed to resolve the required GitHub API token. Please make sure to set the "GITHUB_TOKEN" environment variable or authenticate using the GitHub CLI.');
+    }
+
+    $httpClient = new GuzzleHttpClient([
+        'base_uri' => 'https://api.github.com',
+        'headers' => [
+            'Accept' => 'application/vnd.github+json',
+            'Authorization' => sprintf('Bearer %s', $token),
+            'X-GitHub-Api-Version' => '2022-11-28',
+            'User-Agent' => 'imbo/releaser',
+        ],
+    ]);
+    $gitHubClient = new Client($httpClient);
+    $app = new Application($gitHubClient);
+
+    exit($app->run());
+} catch (Throwable $e) {
+    fwrite(STDERR, sprintf('Error: %s', $e->getMessage()).PHP_EOL);
+    exit(1);
+}
