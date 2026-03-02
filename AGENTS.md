@@ -6,9 +6,8 @@ Guidance for coding agents working in this repository.
 
 `imbo/releaser` is a PHP 8.3+ CLI application that helps create GitHub releases by:
 
-- Inspecting branches, tags, and merged pull requests
-- Determining the next semantic version from Conventional Commit titles
-- Rendering release notes from Twig templates
+- Inspecting branches, tags, and merged pull requests using the GitHub API
+- Determining the next semantic version from Conventional Commit pull request titles
 - Creating tags/releases via GitHub APIs
 
 ## Tech stack
@@ -16,7 +15,6 @@ Guidance for coding agents working in this repository.
 - Language: PHP 8.3+
 - CLI framework: Symfony Console
 - HTTP: Guzzle
-- Templating: Twig
 - SemVer: `phlak/semver`
 - Conventional Commits parser: `ramsey/conventional-commits`
 - Tests: PHPUnit
@@ -30,7 +28,6 @@ Guidance for coding agents working in this repository.
 - `src/Console/Application.php`: Symfony Console app wiring
 - `src/Config.php`, `src/ConfigInterface.php`, `src/Config/Resolver.php`: configuration defaults and config file loading
 - `src/GitHub/*`: API client and DTOs
-- `templates/*.twig`: release note templates
 - `tests/*`: PHPUnit tests
 
 ## Local workflow commands
@@ -66,7 +63,6 @@ Run `composer run ci` after making changes.
 - Repository format is `owner/repo`.
 - Branch conventions are centered around `main` and maintenance branches (`X.x` / `vX.x`) per README assumptions.
 - Tag conventions are semantic versions (`X.Y.Z`, optional `v` prefix).
-- Release notes are generated from merged PRs (Conventional Commit-compatible titles).
 - Configuration is loaded from `.imbo-releaser.php` or `.imbo-releaser.dist.php` (or explicit `--config`).
 
 ## Guardrails
