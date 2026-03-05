@@ -8,6 +8,7 @@ use Symfony\Component\Console\Application as BaseApplication;
 
 class Application extends BaseApplication
 {
+    /** @codeCoverageIgnore */
     public function __construct(Client $gitHubClient)
     {
         parent::__construct('Imbo releaser');
