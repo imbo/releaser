@@ -65,7 +65,7 @@ final class Client
         return $this->fetchPaginated(
             sprintf('/repos/%s/pulls?state=closed&per_page=100', $repository),
             PullRequest::fromAPI(...),
-            filter: static function (array $item): bool {
+            static function (array $item): bool {
                 return
                     ($item['merged_at'] ?? null) !== null
                     && ($item['user'] ?? null) !== null;
