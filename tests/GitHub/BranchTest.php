@@ -13,7 +13,7 @@ class BranchTest extends TestCase
     /**
      * @return array<string,array{data:array<mixed>,error:string}>
      */
-    public static function getInvalidAPIData(): array
+    public static function fromAPIProvider(): array
     {
         return [
             'empty array' => [
@@ -32,7 +32,7 @@ class BranchTest extends TestCase
     /**
      * @param array{data:array<mixed>} $data
      */
-    #[DataProvider('getInvalidAPIData')]
+    #[DataProvider('fromAPIProvider')]
     public function testFromAPIWithInvalidData(array $data, string $error): void
     {
         $this->expectException(InvalidArgumentException::class);
