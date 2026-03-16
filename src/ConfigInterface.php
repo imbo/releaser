@@ -3,6 +3,8 @@
 namespace ImboReleaser;
 
 use ImboReleaser\GitHub\Branch;
+use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\Tag;
 use PHLAK\SemVer\Version;
 
 interface ConfigInterface
@@ -31,4 +33,33 @@ interface ConfigInterface
      * Determine whether a branch should be included in the release process.
      */
     public function filterBranch(Branch $branch): bool;
+
+    /**
+     * Determine whether a tag should be included in the release process.
+     */
+    public function filterTag(Tag $tag): bool;
+
+    /**
+     * Determine whether a pull request should be included in the release process.
+     */
+    public function filterPullRequest(PullRequest $pullRequest): bool;
+
+    /**
+     * Determine the version of the next release.
+     *
+     * @param array<PullRequest> $pullRequests
+     */
+    public function determineNextVersion(Tag $currentTag, array $pullRequests): Version;
+
+    /**
+     * Get the latest version for a given branch.
+     *
+     * @param array<Tag> $tags
+     */
+    public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag;
+
+    /**
+     * Get the template to use for the release notes.
+     */
+    public function template(): string;
 }
