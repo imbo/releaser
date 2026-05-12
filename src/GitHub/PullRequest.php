@@ -24,6 +24,8 @@ final class PullRequest
         public readonly DateTimeImmutable $mergedAt,
         public readonly string $rawMessage,
         public readonly string $baseRef,
+        /** @var list<string> */
+        public readonly array $labels = [],
     ) {
         try {
             $this->message = (new Parser())->parse($rawMessage);
@@ -87,6 +89,10 @@ final class PullRequest
             throw new InvalidArgumentException(sprintf('Invalid "merged_at" value: %s', $mergedAt), previous: $e);
         }
 
-        return new self($number, new User($login), $mergedAtDateTime, $message, $ref);
+        /** @var list<array{name:string}> $labels */
+        $labels = $data['labels'] ?? [];
+        $labels = array_map(static fn (array $label): string => $label['name'], $labels);
+
+        return new self($number, new User($login), $mergedAtDateTime, $message, $ref, $labels);
     }
 }

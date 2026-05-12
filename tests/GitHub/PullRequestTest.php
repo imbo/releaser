@@ -123,6 +123,10 @@ class PullRequestTest extends TestCase
             'base' => [
                 'ref' => 'main',
             ],
+            'labels' => [
+                ['name' => 'bug'],
+                ['name' => 'enhancement'],
+            ],
         ]);
         $this->assertSame(123, $pullRequest->number);
         $this->assertSame('johndoe', $pullRequest->user->login);
@@ -131,6 +135,7 @@ class PullRequestTest extends TestCase
         $this->assertStringStartsWith('feat: add new feature', (string) $pullRequest->message);
         $this->assertStringContainsString('This is the body of the pull request.', (string) $pullRequest->message);
         $this->assertSame('main', $pullRequest->baseRef);
+        $this->assertSame(['bug', 'enhancement'], $pullRequest->labels);
     }
 
     public function testFromAPIWithInvalidConventionalCommitMessage(): void
