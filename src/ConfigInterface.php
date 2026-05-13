@@ -3,6 +3,9 @@
 namespace ImboReleaser;
 
 use ImboReleaser\GitHub\Branch;
+use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\Tag;
+use ImboReleaser\GitHub\User;
 use PHLAK\SemVer\Version;
 
 interface ConfigInterface
@@ -14,6 +17,11 @@ interface ConfigInterface
      * first release.
      */
     public function initialVersion(): Version;
+
+    /**
+     * Get the version prefix.
+     */
+    public function versionPrefix(): ?string;
 
     /**
      * Get the GitHub repository to use for the release process, in the format "owner/repo". If null
@@ -31,4 +39,52 @@ interface ConfigInterface
      * Determine whether a branch should be included in the release process.
      */
     public function filterBranch(Branch $branch): bool;
+
+    /**
+     * Determine whether a tag should be included in the release process.
+     */
+    public function filterTag(Tag $tag): bool;
+
+    /**
+     * Determine whether a pull request should be included in the release process.
+     */
+    public function filterPullRequest(PullRequest $pullRequest): bool;
+
+    /**
+     * Determine the version of the next release.
+     *
+     * @param array<PullRequest> $pullRequests
+     */
+    public function determineNextVersion(Tag $currentTag, array $pullRequests): Version;
+
+    /**
+     * Get the latest version for a given branch.
+     *
+     * @param array<Tag> $tags
+     */
+    public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag;
+
+    /**
+     * Get the template to use for the release notes.
+     */
+    public function template(): string;
+
+    /**
+     * Get the pull request groups for the release process.
+     *
+     * The keys of the array represent the group names that will be used in the release notes, and
+     * the values are lists of pull request types (e.g., "feat", "fix") that belong to each group.
+     * The ordering of the keys in the array determines the order of the groups in the release
+     * notes. Pull requests that don't match any of the types defined in the groups will be placed
+     * in a fallback group, which can be defined using the `fallbackGroup()` method.
+     *
+     * @return array<string,list<string>>
+     */
+    public function pullRequestGroups(): array;
+
+    /**
+     * The name of the group to use for pull requests that don't match any of the groups defined in
+     * `pullRequestGroups()`.
+     */
+    public function fallbackGroup(): string;
 }

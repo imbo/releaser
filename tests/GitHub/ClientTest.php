@@ -32,7 +32,7 @@ class ClientTest extends TestCase
         );
 
         $gitHubClient = new Client($guzzleClient);
-        $branches = iterator_to_array($gitHubClient->getBranches('owner/repo'));
+        $branches = iterator_to_array($gitHubClient->getBranches(Repository::fromString('owner/repo')));
 
         $this->assertCount(3, $branches);
         $this->assertSame('main', $branches[0]->name);
@@ -54,7 +54,7 @@ class ClientTest extends TestCase
         );
 
         $gitHubClient = new Client($guzzleClient);
-        $tags = iterator_to_array($gitHubClient->getTags('owner/repo'));
+        $tags = iterator_to_array($gitHubClient->getTags(Repository::fromString('owner/repo')));
 
         $this->assertCount(2, $tags);
         $this->assertSame('1.1.1', $tags[0]->name);
@@ -70,21 +70,29 @@ class ClientTest extends TestCase
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
+                // should be included
                 ['number' => 4, 'user' => ['login' => 'some-user'], 'title' => 'some title', 'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main']],
+
+                // skipped because of missing merged_at
                 ['number' => 3, 'user' => ['login' => 'some-user'], 'title' => 'some title', 'merged_at' => null, 'base' => ['ref' => 'main']],
+
+                // should be included
                 ['number' => 2, 'user' => ['login' => 'some-user'], 'title' => 'some title', 'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main']],
+
+                // skipped because of missing merged_at
                 ['number' => 1, 'user' => ['login' => 'some-user'], 'title' => 'some title', 'merged_at' => null, 'base' => ['ref' => 'main']],
             ])),
         );
 
-        $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests('owner/repo'));
+        $client = new Client($guzzleClient);
+        $pullRequests = iterator_to_array($client->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
 
         $this->assertCount(2, $pullRequests);
         $this->assertSame(4, $pullRequests[0]->number);
         $this->assertSame(2, $pullRequests[1]->number);
 
         $this->assertCount(1, $history);
-        $this->assertSame('/repos/owner/repo/pulls?state=closed&per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&base=main&per_page=100', (string) $history[0]['request']->getUri());
     }
 
     public function testFetchPaginatedWithErrorResponse(): void
@@ -95,7 +103,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('GitHub API: 404 Not Found');
-        iterator_to_array((new Client($guzzleClient))->getTags('owner/repo'));
+        iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
     public function testFetchPaginatedWithNoJSON(): void
@@ -106,7 +114,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('GitHub API: Syntax error');
-        iterator_to_array((new Client($guzzleClient))->getTags('owner/repo'));
+        iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
     public function testFetchPaginatedWithNonArrayInJSON(): void
@@ -117,7 +125,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('items from the GitHub API, got: string');
-        iterator_to_array((new Client($guzzleClient))->getTags('owner/repo'));
+        iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
     public function testFetchPaginatedWithInvalidArrayInJSON(): void
@@ -128,7 +136,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('GitHub API to be an array, got: string');
-        iterator_to_array((new Client($guzzleClient))->getTags('owner/repo'));
+        iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
     public function testGetShaDateTimeWithMissingCommitter(): void
@@ -139,7 +147,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Missing required "committer"');
-        (new Client($guzzleClient))->getShaDateTime('owner/repo', 'abc123');
+        (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
     public function testGetShaDateTimeWithMissingDate(): void
@@ -150,7 +158,7 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Missing required "committer.date"');
-        (new Client($guzzleClient))->getShaDateTime('owner/repo', 'abc123');
+        (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
     public function testGetShaDateTime(): void
@@ -159,7 +167,7 @@ class ClientTest extends TestCase
             new Response(200, [], $this->json(['sha' => 'abc123', 'committer' => ['date' => '2026-01-01T00:00:00Z']])),
         );
 
-        $date = (new Client($guzzleClient))->getShaDateTime('owner/repo', 'abc123');
+        $date = (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
         $this->assertSame('Thu, 01 Jan 2026 00:00:00 +0000', $date->format(DATE_RFC2822));
 
         $this->assertCount(1, $history);

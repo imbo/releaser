@@ -7,15 +7,13 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-use const PHP_EOL;
-
 #[CoversClass(PullRequest::class)]
 class PullRequestTest extends TestCase
 {
     /**
      * @return array<string,array{data:array<mixed>,error:string}>
      */
-    public static function getInvalidAPIData(): array
+    public static function fromAPIProvider(): array
     {
         return [
             'empty array' => [
@@ -104,7 +102,7 @@ class PullRequestTest extends TestCase
     /**
      * @param array<mixed> $data
      */
-    #[DataProvider('getInvalidAPIData')]
+    #[DataProvider('fromAPIProvider')]
     public function testFromAPIWithInvalidData(array $data, string $error): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -121,16 +119,23 @@ class PullRequestTest extends TestCase
             ],
             'merged_at' => '2024-01-01T00:00:00Z',
             'title' => 'feat: add new feature',
+            'body' => 'This is the body of the pull request.',
             'base' => [
                 'ref' => 'main',
+            ],
+            'labels' => [
+                ['name' => 'bug'],
+                ['name' => 'enhancement'],
             ],
         ]);
         $this->assertSame(123, $pullRequest->number);
         $this->assertSame('johndoe', $pullRequest->user->login);
         $this->assertSame('2024-01-01T00:00:00+00:00', $pullRequest->mergedAt->format('c'));
-        $this->assertSame('feat: add new feature', $pullRequest->rawTitle);
-        $this->assertSame('feat: add new feature'.PHP_EOL, (string) $pullRequest->title);
+        $this->assertStringStartsWith('feat: add new feature', $pullRequest->rawMessage);
+        $this->assertStringStartsWith('feat: add new feature', (string) $pullRequest->message);
+        $this->assertStringContainsString('This is the body of the pull request.', (string) $pullRequest->message);
         $this->assertSame('main', $pullRequest->baseRef);
+        $this->assertSame(['bug', 'enhancement'], $pullRequest->labels);
     }
 
     public function testFromAPIWithInvalidConventionalCommitMessage(): void
@@ -146,6 +151,6 @@ class PullRequestTest extends TestCase
                 'ref' => 'main',
             ],
         ]);
-        $this->assertNull($pullRequest->title);
+        $this->assertNull($pullRequest->message);
     }
 }

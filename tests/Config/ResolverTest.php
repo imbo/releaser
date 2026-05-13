@@ -18,66 +18,88 @@ class ResolverTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('does not return a valid configuration');
-        new Resolver(new Config(), getcwd() ?: null, dirname(__DIR__).'/fixtures/invalid-custom-config.php');
+        (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/invalid-custom-config-1.php');
     }
 
     public function testLoadMissingConfigFile(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('does not return a valid configuration');
-        new Resolver(new Config(), getcwd() ?: null, dirname(__DIR__).'/fixtures/missing-config.php');
+        (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/missing-config.php');
     }
 
     /**
      * @return array<string,array{default:ConfigInterface,expectedVersion:string,expectedConfigFilePath:?string,cwd:?string,configFile:?string}>
      */
-    public static function getConfigCandidates(): array
+    public static function configResolverProvider(): array
     {
         /** @var ConfigInterface $custom */
-        $custom = require dirname(__DIR__).'/fixtures/valid-custom-config.php';
+        $custom = require dirname(__DIR__).'/fixtures/valid-custom-config-1.php';
 
         return [
             'config in cwd' => [
                 'default' => new Config(),
-                'expectedVersion' => '0.0.0',
-                'expectedConfigFilePath' => 'fixtures/.imbo-releaser.php',
                 'cwd' => dirname(__DIR__).'/fixtures',
                 'configFile' => null,
+                'expectedVersion' => '0.0.0',
+                'expectedConfigFilePath' => 'fixtures/.imbo-releaser.php',
             ],
             'default config' => [
                 'default' => new Config(),
-                'expectedVersion' => '0.1.0',
-                'expectedConfigFilePath' => null,
                 'cwd' => __DIR__,
                 'configFile' => null,
+                'expectedVersion' => '0.1.0',
+                'expectedConfigFilePath' => null,
             ],
             'custom config file' => [
                 'default' => new Config(),
+                'cwd' => getcwd() ?: '',
+                'configFile' => dirname(__DIR__).'/fixtures/valid-custom-config-1.php',
                 'expectedVersion' => '1.0.0',
-                'expectedConfigFilePath' => 'fixtures/valid-custom-config.php',
-                'cwd' => getcwd() ?: null,
-                'configFile' => dirname(__DIR__).'/fixtures/valid-custom-config.php',
+                'expectedConfigFilePath' => 'fixtures/valid-custom-config-1.php',
             ],
             'custom default config' => [
                 'default' => $custom,
+                'cwd' => __DIR__,
+                'configFile' => null,
                 'expectedVersion' => '1.0.0',
                 'expectedConfigFilePath' => null,
-                'cwd' => null,
-                'configFile' => null,
             ],
         ];
     }
 
-    #[DataProvider('getConfigCandidates')]
-    public function testGetConfig(ConfigInterface $default, string $expectedVersion, ?string $expectedConfigFilePath, ?string $cwd, ?string $configFile): void
+    #[DataProvider('configResolverProvider')]
+    public function testGetConfig(ConfigInterface $default, ?string $cwd, ?string $configFile, string $expectedVersion, ?string $expectedConfigFilePath): void
     {
-        $resolver = new Resolver($default, $cwd, $configFile);
-        $this->assertSame($expectedVersion, (string) $resolver->getConfig()->initialVersion());
+        $resolver = new Resolver($default, $cwd);
+        $config = $resolver->getConfig($configFile);
+        $this->assertSame($expectedVersion, (string) $config->initialVersion());
 
         if (null === $expectedConfigFilePath || '' === $expectedConfigFilePath) {
             $this->assertNull($resolver->configFilePath());
         } else {
-            $this->assertStringEndsWith($expectedConfigFilePath, $resolver->configFilePath() ?: '');
+            $path = $resolver->configFilePath();
+            if (null === $path) {
+                $this->fail('Expected a config file path, got null');
+            }
+
+            $this->assertStringEndsWith($expectedConfigFilePath, $path);
         }
+
+        $this->assertSame($config, $resolver->getConfig());
+    }
+
+    public function testGetConfigMultipleTimesWithDifferentFiles(): void
+    {
+        $resolver = new Resolver();
+        $config1 = $resolver->getConfig(dirname(__DIR__).'/fixtures/valid-custom-config-1.php');
+        $config2 = $resolver->getConfig();
+        $this->assertSame($config1, $config2);
+
+        $config3 = $resolver->getConfig(dirname(__DIR__).'/fixtures/valid-custom-config-2.php');
+        $config4 = $resolver->getConfig();
+        $this->assertSame($config3, $config4);
+
+        $this->assertNotSame($config1, $config3);
     }
 }

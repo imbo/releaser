@@ -16,19 +16,21 @@ use function sprintf;
 
 final class PullRequest
 {
-    public readonly ?Message $title;
+    public readonly ?Message $message;
 
     public function __construct(
         public readonly int $number,
         public readonly User $user,
         public readonly DateTimeImmutable $mergedAt,
-        public readonly string $rawTitle,
+        public readonly string $rawMessage,
         public readonly string $baseRef,
+        /** @var list<string> */
+        public readonly array $labels = [],
     ) {
         try {
-            $this->title = (new Parser())->parse($rawTitle);
+            $this->message = (new Parser())->parse($rawMessage);
         } catch (InvalidCommitMessage) {
-            $this->title = null;
+            $this->message = null;
         }
     }
 
@@ -56,9 +58,14 @@ final class PullRequest
             throw new InvalidArgumentException(sprintf('Missing required "user.login" key: %s', var_export($data, true)));
         }
 
-        $title = $data['title'] ?? null;
-        if (!is_string($title)) {
+        $message = $data['title'] ?? null;
+        if (!is_string($message)) {
             throw new InvalidArgumentException(sprintf('Missing required "title" key: %s', var_export($data, true)));
+        }
+
+        $body = $data['body'] ?? null;
+        if (null !== $body && is_string($body)) {
+            $message .= "\n\n".$body;
         }
 
         $mergedAt = $data['merged_at'] ?? null;
@@ -82,6 +89,10 @@ final class PullRequest
             throw new InvalidArgumentException(sprintf('Invalid "merged_at" value: %s', $mergedAt), previous: $e);
         }
 
-        return new self($number, new User($login), $mergedAtDateTime, $title, $ref);
+        /** @var list<array{name:string}> $labels */
+        $labels = $data['labels'] ?? [];
+        $labels = array_map(static fn (array $label): string => $label['name'], $labels);
+
+        return new self($number, new User($login), $mergedAtDateTime, $message, $ref, $labels);
     }
 }
