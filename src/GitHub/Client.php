@@ -34,10 +34,10 @@ final class Client
      *
      * @return iterable<Branch>
      */
-    public function getBranches(string $repository): iterable
+    public function getBranches(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/branches?per_page=100', $repository),
+            sprintf('/repos/%s/%s/branches?per_page=100', $repository->owner, $repository->repo),
             Branch::fromAPI(...),
         );
     }
@@ -47,27 +47,37 @@ final class Client
      *
      * @return iterable<Tag>
      */
-    public function getTags(string $repository): iterable
+    public function getTags(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/tags?per_page=100', $repository),
+            sprintf('/repos/%s/%s/tags?per_page=100', $repository->owner, $repository->repo),
             Tag::fromAPI(...),
         );
     }
 
     /**
-     * Get all merged pull requests for the given repository.
+     * Get pull requests merged to a specific branch for the given repository.
+     *
+     * Drafts and pull requests missing either a user or a merged timestamp are skipped.
+     *
+     * The returned pull requests are sorted by creation date in descending order.
      *
      * @return iterable<PullRequest>
      */
-    public function getMergedPullRequests(string $repository): iterable
+    public function getMergedPullRequests(Branch $branch, Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/pulls?state=closed&per_page=100', $repository),
+            sprintf(
+                '/repos/%s/%s/pulls?state=closed&sort=created&direction=desc&base=%s&per_page=100',
+                $repository->owner,
+                $repository->repo,
+                $branch->name,
+            ),
             PullRequest::fromAPI(...),
             static function (array $item): bool {
                 return
-                    ($item['merged_at'] ?? null) !== null
+                    ($item['draft'] ?? false) === false
+                    && ($item['merged_at'] ?? null) !== null
                     && ($item['user'] ?? null) !== null;
             },
         );
@@ -78,9 +88,9 @@ final class Client
      *
      * @throws RuntimeException
      */
-    public function getShaDateTime(string $repository, string $sha): DateTimeImmutable
+    public function getShaDateTime(Repository $repository, string $sha): DateTimeImmutable
     {
-        [$data] = $this->getJsonAsArray(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
+        [$data] = $this->getJsonAsArray(sprintf('/repos/%s/%s/git/commits/%s', $repository->owner, $repository->repo, $sha));
         $committer = $data['committer'] ?? null;
         if (!is_array($committer)) {
             throw new RuntimeException(sprintf('Missing required "committer" key for commit "%s"', $sha));

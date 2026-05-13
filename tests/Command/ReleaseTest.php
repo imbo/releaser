@@ -85,7 +85,15 @@ class ReleaseTest extends TestCase
             new Response(200, [], $this->json([
                 ['name' => 'main'],
                 ['name' => 'develop'],
-            ])),
+            ])), // branches
+            new Response(200, [], $this->json([[
+                'number' => 123,
+                'user' => ['login' => 'johndoe'],
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: add new feature',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
         );
         $command = new Release(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
@@ -101,7 +109,15 @@ class ReleaseTest extends TestCase
                 ['name' => 'main'],
                 ['name' => 'v1'],
                 ['name' => 'v2.x'],
-            ])),
+            ])), // branches
+            new Response(200, [], $this->json([[
+                'number' => 123,
+                'user' => ['login' => 'johndoe'],
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: add new feature',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
         );
         $command = new Release(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
@@ -112,11 +128,58 @@ class ReleaseTest extends TestCase
 
     public function testUsingDefaultConfiguration(): void
     {
-        [$guzzleClient] = $this->getGuzzleClient();
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 123,
+                'user' => ['login' => 'johndoe'],
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: add new feature',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+        );
         $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
         $this->assertStringContainsString('using default configuration', $commandTester->getDisplay());
         $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
+    }
+
+    public function testNoPullRequests(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'name' => 'v1.0.0',
+                'commit' => ['sha' => 'sha'],
+            ]])), // tags
+            new Response(200, [], $this->json([
+                'committer' => ['date' => '2024-01-01T00:00:00Z'],
+            ])), // commits
+            new Response(200, [], $this->json([])), // pull requests
+        );
+        $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No pull requests found, aborting release.');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+    }
+
+    public function testInvalidTemplate(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 123,
+                'user' => ['login' => 'johndoe'],
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: add new feature',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+        );
+        $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The specified template file "invalid-template" does not exist or is not readable.');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--template' => 'invalid-template']);
     }
 }

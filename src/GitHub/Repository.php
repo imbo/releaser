@@ -21,6 +21,11 @@ final class Repository implements Stringable
         return sprintf('%s/%s', $this->owner, $this->repo);
     }
 
+    public function url(): string
+    {
+        return sprintf('https://github.com/%s/%s', $this->owner, $this->repo);
+    }
+
     public static function fromString(string $repository): self
     {
         $parts = explode('/', $repository);

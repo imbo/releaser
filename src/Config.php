@@ -8,11 +8,26 @@ use ImboReleaser\GitHub\Tag;
 use InvalidArgumentException;
 use PHLAK\SemVer\Version;
 
+use function dirname;
+use function in_array;
+
+use const DIRECTORY_SEPARATOR;
+
 class Config implements ConfigInterface
 {
+    protected const INITIAL_VERSION = '0.1.0';
+    protected const USERNAMES_TO_EXCLUDE = ['dependabot[bot]'];
+    protected const MAIN_BRANCH_NAMES = ['main', 'master'];
+    protected const PULL_REQUEST_LABELS_TO_EXCLUDE = ['skip-release'];
+
     public function initialVersion(): Version
     {
-        return new Version('0.1.0');
+        return new Version(self::INITIAL_VERSION);
+    }
+
+    public function versionPrefix(): ?string
+    {
+        return 'v';
     }
 
     public function gitHubRepository(): ?string
@@ -28,8 +43,7 @@ class Config implements ConfigInterface
     public function filterBranch(Branch $branch): bool
     {
         return
-            'main' === $branch->name
-            || 'master' === $branch->name
+            in_array($branch->name, self::MAIN_BRANCH_NAMES, true)
             || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/', $branch->name);
     }
 
@@ -40,7 +54,10 @@ class Config implements ConfigInterface
 
     public function filterPullRequest(PullRequest $pullRequest): bool
     {
-        return null !== $pullRequest->message;
+        return
+            null !== $pullRequest->message
+            && !in_array($pullRequest->user->login, self::USERNAMES_TO_EXCLUDE, true)
+            && empty(array_intersect(self::PULL_REQUEST_LABELS_TO_EXCLUDE, $pullRequest->labels));
     }
 
     /**
@@ -117,11 +134,25 @@ class Config implements ConfigInterface
 
     public function template(): string
     {
-        return 'default';
+        return dirname(__DIR__).DIRECTORY_SEPARATOR.'templates'.DIRECTORY_SEPARATOR.'default.twig';
     }
 
     private function isMainBranch(Branch $branch): bool
     {
-        return 'main' === $branch->name || 'master' === $branch->name;
+        return in_array($branch->name, self::MAIN_BRANCH_NAMES, true);
+    }
+
+    public function pullRequestGroups(): array
+    {
+        return [
+            'New Features 🚀' => ['feat'],
+            'Bug Fixes 🐛' => ['fix'],
+            'Documentation 📚' => ['docs'],
+        ];
+    }
+
+    public function fallbackGroup(): string
+    {
+        return 'Other Changes ✨';
     }
 }

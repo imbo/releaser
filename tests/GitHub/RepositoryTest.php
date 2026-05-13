@@ -27,4 +27,10 @@ class RepositoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         Repository::fromString('invalid-repo-string');
     }
+
+    public function testUrl(): void
+    {
+        $repository = new Repository('imbo', 'releaser');
+        $this->assertSame('https://github.com/imbo/releaser', $repository->url());
+    }
 }

@@ -20,12 +20,19 @@ class ConfigTest extends TestCase
         $config = new Config();
 
         $this->assertSame('0.1.0', (string) $config->initialVersion());
+        $this->assertSame('v', $config->versionPrefix());
         $this->assertNull($config->gitHubRepository());
         $this->assertNull($config->branch());
         $this->assertTrue($config->filterBranch(new Branch('main')));
         $this->assertTrue($config->filterBranch(new Branch('v1')));
         $this->assertFalse($config->filterBranch(new Branch('feature-branch')));
-        $this->assertSame('default', (string) $config->template());
+        $this->assertStringEndsWith('/templates/default.twig', (string) $config->template());
+        $this->assertSame([
+            'New Features 🚀' => ['feat'],
+            'Bug Fixes 🐛' => ['fix'],
+            'Documentation 📚' => ['docs'],
+        ], $config->pullRequestGroups());
+        $this->assertSame('Other Changes ✨', $config->fallbackGroup());
     }
 
     /**
