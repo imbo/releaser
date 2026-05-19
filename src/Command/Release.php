@@ -23,6 +23,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Question\Question;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
@@ -81,6 +83,11 @@ class Release extends Command
                 'template', 't',
                 InputOption::VALUE_REQUIRED,
                 'Path to the Twig template to use for the release notes.',
+            )
+            ->addOption(
+                'no-edit', null,
+                InputOption::VALUE_NONE,
+                'Do not open an editor to edit the release notes before creating the release.',
             );
     }
 
@@ -200,6 +207,10 @@ class Release extends Command
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),
             $this->getNewContributors($pullRequests, $since),
         ));
+
+        if ($input->isInteractive() && !$input->getOption('no-edit')) {
+            $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->defaultEditor());
+        }
 
         // ...
 
@@ -373,5 +384,45 @@ class Release extends Command
         $twig = new Environment(new FilesystemLoader(dirname($template)));
 
         return $twig->render(basename($template), get_object_vars($data));
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    private function editReleaseNotes(string $releaseNotes, string $defaultEditor): string
+    {
+        if (!Process::isTtySupported()) {
+            throw new RuntimeException('Cannot launch interactive editor: no TTY detected. Use --no-edit or run in an interactive terminal.');
+        }
+
+        $editor = getenv('VISUAL') ?: getenv('EDITOR') ?: $defaultEditor;
+        $tmpFile = tempnam(sys_get_temp_dir(), 'release_notes_');
+        if (false === $tmpFile) {
+            throw new RuntimeException('Failed to create a temporary file for editing release notes.');
+        }
+
+        try {
+            if (false === file_put_contents($tmpFile, $releaseNotes)) {
+                throw new RuntimeException('Failed to write release notes to temporary file.');
+            }
+
+            $process = Process::fromShellCommandline($editor.' '.escapeshellarg($tmpFile));
+            $process->setTty(true);
+
+            try {
+                $process->mustRun();
+            } catch (ProcessFailedException $e) {
+                throw new RuntimeException(sprintf('Editor exited with code %d', $process->getExitCode() ?? -1), 0, $e);
+            }
+
+            $contents = file_get_contents($tmpFile);
+            if (false === $contents) {
+                throw new RuntimeException('Failed to read edited release notes from temporary file.');
+            }
+
+            return $contents;
+        } finally {
+            is_file($tmpFile) && unlink($tmpFile);
+        }
     }
 }

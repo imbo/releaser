@@ -97,7 +97,7 @@ class ReleaseTest extends TestCase
         );
         $command = new Release(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['--repository' => 'owner/repo']);
+        $commandTester->execute(['--repository' => 'owner/repo', '--no-edit' => true]);
         $this->assertStringContainsString('Only one branch available (main)', $commandTester->getDisplay());
         $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
     }
@@ -122,7 +122,7 @@ class ReleaseTest extends TestCase
         $command = new Release(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', 'main']);
-        $commandTester->execute([]);
+        $commandTester->execute(['--no-edit' => true]);
         $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
     }
 
@@ -140,7 +140,7 @@ class ReleaseTest extends TestCase
         );
         $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
         $this->assertStringContainsString('using default configuration', $commandTester->getDisplay());
         $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
     }
