@@ -87,4 +87,10 @@ interface ConfigInterface
      * `pullRequestGroups()`.
      */
     public function fallbackGroup(): string;
+
+    /**
+     * Get the default editor to use for editing release notes. This can be overridden by setting
+     * the `VISUAL` or `EDITOR` environment variables.
+     */
+    public function defaultEditor(): string;
 }

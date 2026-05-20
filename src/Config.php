@@ -155,4 +155,9 @@ class Config implements ConfigInterface
     {
         return 'Other Changes ✨';
     }
+
+    public function defaultEditor(): string
+    {
+        return 'vi';
+    }
 }
