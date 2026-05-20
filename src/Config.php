@@ -156,7 +156,7 @@ class Config implements ConfigInterface
         return 'Other Changes ✨';
     }
 
-    public function defaultEditor(): string
+    public function editor(): string
     {
         return 'vi';
     }

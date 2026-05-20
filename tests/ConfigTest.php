@@ -33,6 +33,7 @@ class ConfigTest extends TestCase
             'Documentation 📚' => ['docs'],
         ], $config->pullRequestGroups());
         $this->assertSame('Other Changes ✨', $config->fallbackGroup());
+        $this->assertSame('vi', $config->editor());
     }
 
     /**
