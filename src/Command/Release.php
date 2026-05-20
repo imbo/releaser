@@ -209,7 +209,7 @@ class Release extends Command
         ));
 
         if ($input->isInteractive() && !$input->getOption('no-edit')) {
-            $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->defaultEditor());
+            $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->editor());
         }
 
         // ...
