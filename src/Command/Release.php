@@ -201,7 +201,7 @@ class Release extends Command
         }
 
         $releaseNotes = $this->generateReleaseNotes($template, new TemplateData(
-            $nextVersion->prefix($this->config->versionPrefix() ?? ''),
+            $nextVersion,
             $repository,
             $pullRequestsInRelease,
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),

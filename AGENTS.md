@@ -17,7 +17,7 @@ Guidance for coding agents working in this repository.
 - CLI framework: Symfony Console
 - HTTP: Guzzle
 - Templating: Twig
-- SemVer: `phlak/semver`
+- SemVer: `nikolaposa/version`
 - Conventional Commits parser: `ramsey/conventional-commits`
 - Tests: PHPUnit
 - Static analysis: PHPStan level 10
