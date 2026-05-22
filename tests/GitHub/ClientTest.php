@@ -12,6 +12,7 @@ use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Version\Version;
 
 use const DATE_RFC2822;
 use const JSON_THROW_ON_ERROR;
@@ -113,7 +114,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('GitHub API: Syntax error');
+        $this->expectExceptionMessage('Syntax error');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
@@ -124,7 +125,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('items from the GitHub API, got: string');
+        $this->expectExceptionMessage('Expected an array, got: string');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
@@ -137,6 +138,17 @@ class ClientTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('GitHub API to be an array, got: string');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
+    }
+
+    public function testGetShaDateTimeWithServerError(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(404),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to request commit data from the GitHub API: 404 Not Found');
+        (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
     public function testGetShaDateTimeWithMissingCommitter(): void
@@ -172,6 +184,130 @@ class ClientTest extends TestCase
 
         $this->assertCount(1, $history);
         $this->assertSame('/repos/owner/repo/git/commits/abc123', (string) $history[0]['request']->getUri());
+    }
+
+    public function testCreateAnnotatedTagWithServerErrorWhenFetchingBranchSha(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(404),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to request branch data from the GitHub API: 404 Not Found');
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateAnnotatedTagWithInvalidBranchShaData(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['sha' => null])),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing required "commit.sha" key for branch "main"');
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateAnnotatedTagWithServerErrorWhenCreatingTag(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(422),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to create tag object "1.0.0"');
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateAnnotatedTagWithMissingShaInTagResponse(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['tag' => '1.0.0'])),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing required "sha" key in tag object returned by GitHub.');
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateAnnotatedTagWithServerErrorWhenCreatingRef(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
+            new Response(422),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to create tag reference "1.0.0" for sha "tag-sha-456"');
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateAnnotatedTag(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+        );
+
+        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
+
+        $this->assertCount(3, $history);
+        $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+
+        $this->assertSame('/repos/owner/repo/git/tags', (string) $history[1]['request']->getUri());
+        $this->assertSame('POST', $history[1]['request']->getMethod());
+        $body = $history[1]['request']->getBody()->getContents();
+        $this->assertJson($body);
+        /** @var array<string,mixed> */
+        $tagPayload = json_decode($body, true);
+        $this->assertSame('1.0.0', $tagPayload['tag']);
+        $this->assertSame('Release 1.0.0', $tagPayload['message']);
+        $this->assertSame('branch-sha-123', $tagPayload['object']);
+        $this->assertSame('commit', $tagPayload['type']);
+
+        $this->assertSame('/repos/owner/repo/git/refs', (string) $history[2]['request']->getUri());
+        $this->assertSame('POST', $history[2]['request']->getMethod());
+        $body = $history[2]['request']->getBody()->getContents();
+        $this->assertJson($body);
+        /** @var array<string,mixed> */
+        $refPayload = json_decode($body, true);
+        $this->assertSame('refs/tags/1.0.0', $refPayload['ref']);
+        $this->assertSame('tag-sha-456', $refPayload['sha']);
+    }
+
+    public function testGetMergedPullRequestsSkipsDrafts(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([
+                ['number' => 1, 'user' => ['login' => 'user1'], 'title' => 'feat: new feature', 'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main'], 'draft' => true],
+                ['number' => 2, 'user' => ['login' => 'user2'], 'title' => 'fix: a bug', 'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main'], 'draft' => false],
+            ])),
+        );
+
+        $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
+
+        $this->assertCount(1, $pullRequests);
+        $this->assertSame(2, $pullRequests[0]->number);
+    }
+
+    public function testGetMergedPullRequestsSkipsMissingUser(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([
+                ['number' => 1, 'user' => null, 'title' => 'feat: new feature', 'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main']],
+                ['number' => 2, 'user' => ['login' => 'user2'], 'title' => 'fix: a bug', 'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main']],
+            ])),
+        );
+
+        $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
+
+        $this->assertCount(1, $pullRequests);
+        $this->assertSame(2, $pullRequests[0]->number);
     }
 
     /**

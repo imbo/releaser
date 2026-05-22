@@ -9,6 +9,7 @@ use GuzzleHttp\Psr7\Header;
 use JsonException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
+use Version\Version;
 
 use function array_key_exists;
 use function gettype;
@@ -37,7 +38,7 @@ final class Client
     public function getBranches(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/%s/branches?per_page=100', $repository->owner, $repository->repo),
+            sprintf('/repos/%s/branches?per_page=100', $repository),
             Branch::fromAPI(...),
         );
     }
@@ -50,7 +51,7 @@ final class Client
     public function getTags(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/%s/tags?per_page=100', $repository->owner, $repository->repo),
+            sprintf('/repos/%s/tags?per_page=100', $repository),
             Tag::fromAPI(...),
         );
     }
@@ -68,9 +69,8 @@ final class Client
     {
         return $this->fetchPaginated(
             sprintf(
-                '/repos/%s/%s/pulls?state=closed&sort=created&direction=desc&base=%s&per_page=100',
-                $repository->owner,
-                $repository->repo,
+                '/repos/%s/pulls?state=closed&sort=created&direction=desc&base=%s&per_page=100',
+                $repository,
                 $branch->name,
             ),
             PullRequest::fromAPI(...),
@@ -90,7 +90,15 @@ final class Client
      */
     public function getShaDateTime(Repository $repository, string $sha): DateTimeImmutable
     {
-        [$data] = $this->getJsonAsArray(sprintf('/repos/%s/%s/git/commits/%s', $repository->owner, $repository->repo, $sha));
+        try {
+            $response = $this->httpClient->get(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to request commit data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
+        }
+
+        $data = $this->responseToArray($response);
+
         $committer = $data['committer'] ?? null;
         if (!is_array($committer)) {
             throw new RuntimeException(sprintf('Missing required "committer" key for commit "%s"', $sha));
@@ -102,6 +110,70 @@ final class Client
         }
 
         return new DateTimeImmutable($dateString);
+    }
+
+    /**
+     * Create an annotated tag in the specified repository, pointing to the given branch.
+     *
+     * @throws RuntimeException
+     */
+    public function createAnnotatedTag(Repository $repository, Branch $branch, Version $version, string $message): void
+    {
+        $branchSha = $this->getBranchSha($repository, $branch);
+
+        try {
+            $response = $this->httpClient->post(sprintf('/repos/%s/git/tags', $repository), [
+                'json' => [
+                    'tag' => (string) $version,
+                    'message' => $message,
+                    'object' => $branchSha,
+                    'type' => 'commit',
+                    // 'tagger' => ['name' => '...', 'email' => '...'],
+                ],
+            ]);
+        } catch (ClientException $e) {
+            throw new RuntimeException(sprintf('Failed to create tag object "%s"', $version), previous: $e);
+        }
+
+        $tagData = $this->responseToArray($response);
+
+        if (!isset($tagData['sha']) || !is_string($tagData['sha'])) {
+            throw new RuntimeException('Missing required "sha" key in tag object returned by GitHub.');
+        }
+
+        try {
+            $this->httpClient->post(sprintf('/repos/%s/git/refs', $repository), [
+                'json' => [
+                    'ref' => sprintf('refs/tags/%s', $version),
+                    'sha' => $tagData['sha'],
+                ],
+            ]);
+        } catch (ClientException $e) {
+            throw new RuntimeException(sprintf('Failed to create tag reference "%s" for sha "%s"', $version, $tagData['sha']), previous: $e);
+        }
+    }
+
+    /**
+     * Get the commit SHA for the head of the specified branch in the given repository.
+     *
+     * @throws RuntimeException
+     */
+    private function getBranchSha(Repository $repository, Branch $branch): string
+    {
+        try {
+            $response = $this->httpClient->get(sprintf('/repos/%s/branches/%s', $repository, $branch->name));
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
+        }
+
+        $data = $this->responseToArray($response);
+
+        if (!is_array($data['commit'] ?? null) || !is_string($data['commit']['sha'] ?? null)) {
+            throw new RuntimeException(sprintf('Missing required "commit.sha" key for branch "%s"', $branch->name));
+        }
+
+        return $data['commit']['sha'];
     }
 
     /**
@@ -157,17 +229,7 @@ final class Client
             throw new RuntimeException(sprintf('Failed to request data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
         }
 
-        try {
-            $items = json_decode((string) $response->getBody(), flags: JSON_THROW_ON_ERROR | JSON_OBJECT_AS_ARRAY | JSON_BIGINT_AS_STRING);
-        } catch (JsonException $e) {
-            throw new RuntimeException(sprintf('Failed to decode response body from the GitHub API: %s', $e->getMessage()), previous: $e);
-        }
-
-        if (!is_array($items)) {
-            throw new RuntimeException(sprintf('Expected an array of items from the GitHub API, got: %s', gettype($items)));
-        }
-
-        return [$items, $this->getNextUrl($response)];
+        return [$this->responseToArray($response), $this->getNextUrl($response)];
     }
 
     /**
@@ -187,5 +249,27 @@ final class Client
         }
 
         return null;
+    }
+
+    /**
+     * Convert a GitHub API response to an array.
+     *
+     * @return array<mixed>
+     *
+     * @throws RuntimeException
+     */
+    private function responseToArray(ResponseInterface $response): array
+    {
+        try {
+            $data = json_decode((string) $response->getBody(), flags: JSON_THROW_ON_ERROR | JSON_OBJECT_AS_ARRAY | JSON_BIGINT_AS_STRING);
+        } catch (JsonException $e) {
+            throw new RuntimeException(sprintf('Failed to decode response body: %s', $e->getMessage()), previous: $e);
+        }
+
+        if (!is_array($data)) {
+            throw new RuntimeException(sprintf('Expected an array, got: %s', gettype($data)));
+        }
+
+        return $data;
     }
 }

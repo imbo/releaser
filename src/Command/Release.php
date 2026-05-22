@@ -212,6 +212,8 @@ class Release extends Command
             $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->editor());
         }
 
+        $this->gitHubClient->createAnnotatedTag($repository, $branch, $nextVersion, $releaseNotes);
+
         // ...
 
         return self::SUCCESS;
