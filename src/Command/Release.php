@@ -22,6 +22,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
@@ -200,8 +201,12 @@ class Release extends Command
             }
         }
 
+        if (empty($pullRequestsInRelease)) {
+            throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
+        }
+
         $releaseNotes = $this->generateReleaseNotes($template, new TemplateData(
-            $nextVersion->prefix($this->config->versionPrefix() ?? ''),
+            $nextVersion,
             $repository,
             $pullRequestsInRelease,
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),
@@ -212,7 +217,14 @@ class Release extends Command
             $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->editor());
         }
 
-        // ...
+        $question = new ConfirmationQuestion(sprintf('You are about release "%s". Do you want to continue? (Y/n)', $nextVersion), true);
+        if (!(new QuestionHelper())->ask($input, $output, $question)) {
+            return Command::SUCCESS;
+        }
+
+        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes);
+
+        $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));
 
         return self::SUCCESS;
     }

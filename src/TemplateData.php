@@ -7,8 +7,9 @@ use ImboReleaser\GitHub\Repository;
 
 class TemplateData
 {
+    /** @codeCoverageIgnore */
     public function __construct(
-        public readonly string $nextVersion,
+        public readonly Version $nextVersion,
         public readonly Repository $repository,
         /** @var list<PullRequest> */
         public readonly array $pullRequests,

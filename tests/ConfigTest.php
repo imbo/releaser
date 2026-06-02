@@ -19,8 +19,7 @@ class ConfigTest extends TestCase
     {
         $config = new Config();
 
-        $this->assertSame('0.1.0', (string) $config->initialVersion());
-        $this->assertSame('v', $config->versionPrefix());
+        $this->assertSame('v0.1.0', (string) $config->initialVersion());
         $this->assertNull($config->gitHubRepository());
         $this->assertNull($config->branch());
         $this->assertTrue($config->filterBranch(new Branch('main')));

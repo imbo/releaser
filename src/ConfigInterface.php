@@ -6,7 +6,6 @@ use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Tag;
 use ImboReleaser\GitHub\User;
-use PHLAK\SemVer\Version;
 
 interface ConfigInterface
 {
@@ -17,11 +16,6 @@ interface ConfigInterface
      * first release.
      */
     public function initialVersion(): Version;
-
-    /**
-     * Get the version prefix.
-     */
-    public function versionPrefix(): ?string;
 
     /**
      * Get the GitHub repository to use for the release process, in the format "owner/repo". If null

@@ -6,7 +6,6 @@ use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Tag;
 use InvalidArgumentException;
-use PHLAK\SemVer\Version;
 
 use function dirname;
 use function in_array;
@@ -15,19 +14,14 @@ use const DIRECTORY_SEPARATOR;
 
 class Config implements ConfigInterface
 {
-    protected const INITIAL_VERSION = '0.1.0';
+    protected const INITIAL_VERSION = 'v0.1.0';
     protected const USERNAMES_TO_EXCLUDE = ['dependabot[bot]'];
     protected const MAIN_BRANCH_NAMES = ['main', 'master'];
     protected const PULL_REQUEST_LABELS_TO_EXCLUDE = ['skip-release'];
 
     public function initialVersion(): Version
     {
-        return new Version(self::INITIAL_VERSION);
-    }
-
-    public function versionPrefix(): ?string
-    {
-        return 'v';
+        return Version::fromString(self::INITIAL_VERSION);
     }
 
     public function gitHubRepository(): ?string
@@ -97,16 +91,15 @@ class Config implements ConfigInterface
             }
         }
 
-        $nextVersion = clone $currentTag->version;
         if ($hasBreakingChange) {
-            $nextVersion->incrementMajor()->setMinor(0)->setPatch(0);
-        } elseif ($hasFeature) {
-            $nextVersion->incrementMinor()->setPatch(0);
-        } else {
-            $nextVersion->incrementPatch();
+            return $currentTag->version->incrementMajor();
         }
 
-        return $nextVersion;
+        if ($hasFeature) {
+            return $currentTag->version->incrementMinor();
+        }
+
+        return $currentTag->version->incrementPatch();
     }
 
     public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag

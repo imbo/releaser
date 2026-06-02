@@ -48,7 +48,7 @@ class ResolverTest extends TestCase
                 'default' => new Config(),
                 'cwd' => __DIR__,
                 'configFile' => null,
-                'expectedVersion' => '0.1.0',
+                'expectedVersion' => 'v0.1.0',
                 'expectedConfigFilePath' => null,
             ],
             'custom config file' => [

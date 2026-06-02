@@ -1,11 +1,11 @@
 <?php declare(strict_types=1);
 
 use ImboReleaser\Config;
-use PHLAK\SemVer\Version;
+use ImboReleaser\Version;
 
 return new class extends Config {
     public function initialVersion(): Version
     {
-        return new Version('0.0.0');
+        return Version::fromString('0.0.0');
     }
 };

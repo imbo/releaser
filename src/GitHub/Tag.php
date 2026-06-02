@@ -2,9 +2,8 @@
 
 namespace ImboReleaser\GitHub;
 
+use ImboReleaser\Version;
 use InvalidArgumentException;
-use PHLAK\SemVer\Exceptions\InvalidVersionException;
-use PHLAK\SemVer\Version;
 use Stringable;
 
 use function is_array;
@@ -18,8 +17,8 @@ final class Tag implements Stringable
     public function __construct(public readonly string $name, public readonly string $sha)
     {
         try {
-            $this->version = new Version($this->name);
-        } catch (InvalidVersionException) {
+            $this->version = Version::fromString($this->name);
+        } catch (InvalidArgumentException) {
             $this->version = null;
         }
     }
