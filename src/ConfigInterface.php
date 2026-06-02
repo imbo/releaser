@@ -6,7 +6,6 @@ use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Tag;
 use ImboReleaser\GitHub\User;
-use Version\Version;
 
 interface ConfigInterface
 {

@@ -2,10 +2,9 @@
 
 namespace ImboReleaser\GitHub;
 
+use ImboReleaser\Version;
 use InvalidArgumentException;
 use Stringable;
-use Version\Exception\InvalidVersionString;
-use Version\Version;
 
 use function is_array;
 use function is_string;
@@ -19,7 +18,7 @@ final class Tag implements Stringable
     {
         try {
             $this->version = Version::fromString($this->name);
-        } catch (InvalidVersionString) {
+        } catch (InvalidArgumentException) {
             $this->version = null;
         }
     }

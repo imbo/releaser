@@ -6,10 +6,10 @@ use DateTimeImmutable;
 use GuzzleHttp\Client as GuzzleHttpClient;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Psr7\Header;
+use ImboReleaser\Version;
 use JsonException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
-use Version\Version;
 
 use function array_key_exists;
 use function gettype;
@@ -94,7 +94,7 @@ final class Client
             $response = $this->httpClient->get(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
         } catch (ClientException $e) {
             $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to request commit data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
+            throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($r)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -113,11 +113,42 @@ final class Client
     }
 
     /**
+     * Create a GitHub release.
+     */
+    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes): Release
+    {
+        $this->createAnnotatedTag($repository, $branch, $version, $releaseNotes);
+
+        try {
+            $response = $this->httpClient->post(sprintf('/repos/%s/releases', $repository), [
+                'json' => [
+                    'tag_name' => (string) $version,
+                    'name' => (string) $version,
+                    'body' => $releaseNotes,
+                    'generate_release_notes' => false,
+
+                    // 'draft' => <bool>,
+                    // 'prerelease' => <bool>,
+                    // 'discussion_category_name' => '...',
+                    // 'make_latest' => 'Can be one of: true, false, legacy',
+                ],
+            ]);
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        }
+
+        $data = $this->responseToArray($response);
+
+        return Release::fromAPI($data);
+    }
+
+    /**
      * Create an annotated tag in the specified repository, pointing to the given branch.
      *
      * @throws RuntimeException
      */
-    public function createAnnotatedTag(Repository $repository, Branch $branch, Version $version, string $message): void
+    private function createAnnotatedTag(Repository $repository, Branch $branch, Version $version, string $releaseNotes): void
     {
         $branchSha = $this->getBranchSha($repository, $branch);
 
@@ -125,20 +156,22 @@ final class Client
             $response = $this->httpClient->post(sprintf('/repos/%s/git/tags', $repository), [
                 'json' => [
                     'tag' => (string) $version,
-                    'message' => $message,
+                    'message' => $releaseNotes,
                     'object' => $branchSha,
                     'type' => 'commit',
+
                     // 'tagger' => ['name' => '...', 'email' => '...'],
                 ],
             ]);
         } catch (ClientException $e) {
-            throw new RuntimeException(sprintf('Failed to create tag object "%s"', $version), previous: $e);
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to create tag object for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
         }
 
         $tagData = $this->responseToArray($response);
 
         if (!isset($tagData['sha']) || !is_string($tagData['sha'])) {
-            throw new RuntimeException('Missing required "sha" key in tag object returned by GitHub.');
+            throw new RuntimeException(sprintf('Missing required "sha" key for tag "%s"', $version));
         }
 
         try {
@@ -149,7 +182,8 @@ final class Client
                 ],
             ]);
         } catch (ClientException $e) {
-            throw new RuntimeException(sprintf('Failed to create tag reference "%s" for sha "%s"', $version, $tagData['sha']), previous: $e);
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to create tag reference for version "%s" and sha "%s", got: "%s"', $version, $tagData['sha'], $this->responseStatus($r)), previous: $e);
         }
     }
 
@@ -164,7 +198,7 @@ final class Client
             $response = $this->httpClient->get(sprintf('/repos/%s/branches/%s', $repository, $branch->name));
         } catch (ClientException $e) {
             $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
+            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($r)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -198,7 +232,7 @@ final class Client
 
             foreach ($items as $item) {
                 if (!is_array($item)) {
-                    throw new RuntimeException(sprintf('Expected each item from the GitHub API to be an array, got: %s', gettype($item)));
+                    throw new RuntimeException(sprintf('Expected each item from the GitHub API to be an array, got: "%s"', gettype($item)));
                 }
 
                 if (null !== $filter && !$filter($item)) {
@@ -226,7 +260,7 @@ final class Client
             $response = $this->httpClient->get($url);
         } catch (ClientException $e) {
             $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to request data from the GitHub API: %d %s', $r->getStatusCode(), $r->getReasonPhrase()));
+            throw new RuntimeException(sprintf('Failed to request data from the GitHub API, got: "%s"', $this->responseStatus($r)), previous: $e);
         }
 
         return [$this->responseToArray($response), $this->getNextUrl($response)];
@@ -263,13 +297,18 @@ final class Client
         try {
             $data = json_decode((string) $response->getBody(), flags: JSON_THROW_ON_ERROR | JSON_OBJECT_AS_ARRAY | JSON_BIGINT_AS_STRING);
         } catch (JsonException $e) {
-            throw new RuntimeException(sprintf('Failed to decode response body: %s', $e->getMessage()), previous: $e);
+            throw new RuntimeException(sprintf('Failed to decode response body: "%s"', $e->getMessage()), previous: $e);
         }
 
         if (!is_array($data)) {
-            throw new RuntimeException(sprintf('Expected an array, got: %s', gettype($data)));
+            throw new RuntimeException(sprintf('Expected an array, got: "%s"', gettype($data)));
         }
 
         return $data;
+    }
+
+    private function responseStatus(ResponseInterface $response): string
+    {
+        return sprintf('%d %s', $response->getStatusCode(), $response->getReasonPhrase());
     }
 }

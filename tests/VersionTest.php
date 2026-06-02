@@ -55,11 +55,26 @@ class VersionTest extends TestCase
     public static function fromStringProvider(): array
     {
         return [
-            'no prefix' => ['input' => '1.2.3', 'expected' => '1.2.3'],
-            'v prefix' => ['input' => 'v1.2.3', 'expected' => 'v1.2.3'],
-            'custom prefix' => ['input' => 'release-1.2.3', 'expected' => 'release-1.2.3'],
-            'multi-digit parts' => ['input' => 'v10.20.30', 'expected' => 'v10.20.30'],
-            'zero version' => ['input' => '0.0.0', 'expected' => '0.0.0'],
+            'no prefix' => [
+                'input' => '1.2.3',
+                'expected' => '1.2.3',
+            ],
+            'v prefix' => [
+                'input' => 'v1.2.3',
+                'expected' => 'v1.2.3',
+            ],
+            'custom prefix' => [
+                'input' => 'release-1.2.3',
+                'expected' => 'release-1.2.3',
+            ],
+            'multi-digit parts' => [
+                'input' => 'v10.20.30',
+                'expected' => 'v10.20.30',
+            ],
+            'zero version' => [
+                'input' => '0.0.0',
+                'expected' => '0.0.0',
+            ],
         ];
     }
 
@@ -70,16 +85,26 @@ class VersionTest extends TestCase
     }
 
     /**
-     * @return list<array{string}>
+     * @return array<string,array{input:string}>
      */
     public static function invalidVersionStringProvider(): array
     {
         return [
-            ['1.2'],
-            ['1'],
-            ['foo'],
-            [''],
-            ['v1.2.x'],
+            'missing patch' => [
+                'input' => '1.2',
+            ],
+            'missing minor and patch' => [
+                'input' => '1',
+            ],
+            'invalid string' => [
+                'input' => 'foo',
+            ],
+            'empty string' => [
+                'input' => '',
+            ],
+            'invalid patch' => [
+                'input' => 'v1.2.x',
+            ],
         ];
     }
 

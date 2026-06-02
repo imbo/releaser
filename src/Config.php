@@ -6,7 +6,6 @@ use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Tag;
 use InvalidArgumentException;
-use Version\Version;
 
 use function dirname;
 use function in_array;

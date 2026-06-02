@@ -4,10 +4,10 @@ namespace ImboReleaser;
 
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Repository;
-use Version\Version;
 
 class TemplateData
 {
+    /** @codeCoverageIgnore */
     public function __construct(
         public readonly Version $nextVersion,
         public readonly Repository $repository,

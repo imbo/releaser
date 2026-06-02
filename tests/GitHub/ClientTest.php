@@ -9,10 +9,10 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use ImboReleaser\Version;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Version\Version;
 
 use const DATE_RFC2822;
 use const JSON_THROW_ON_ERROR;
@@ -103,7 +103,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('GitHub API: 404 Not Found');
+        $this->expectExceptionMessage('Failed to request data from the GitHub API, got: "404 Not Found"');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
@@ -125,7 +125,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Expected an array, got: string');
+        $this->expectExceptionMessage('Expected an array, got: "string"');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
@@ -136,7 +136,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('GitHub API to be an array, got: string');
+        $this->expectExceptionMessage('Expected each item from the GitHub API to be an array, got: "string"');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
@@ -147,7 +147,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to request commit data from the GitHub API: 404 Not Found');
+        $this->expectExceptionMessage('Failed to get commit data for "abc123", got: "404 Not Found"');
         (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
@@ -158,7 +158,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Missing required "committer"');
+        $this->expectExceptionMessage('Missing required "committer" key for commit "abc123"');
         (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
@@ -169,7 +169,7 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Missing required "committer.date"');
+        $this->expectExceptionMessage('Missing required "committer.date" key for commit "abc123"');
         (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 
@@ -186,18 +186,18 @@ class ClientTest extends TestCase
         $this->assertSame('/repos/owner/repo/git/commits/abc123', (string) $history[0]['request']->getUri());
     }
 
-    public function testCreateAnnotatedTagWithServerErrorWhenFetchingBranchSha(): void
+    public function testCreateReleaseWithServerErrorWhenFetchingBranchSha(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(404),
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to request branch data from the GitHub API: 404 Not Found');
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+        $this->expectExceptionMessage('Failed to request branch data from the GitHub API for branch "main", got: "404 Not Found"');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateAnnotatedTagWithInvalidBranchShaData(): void
+    public function testCreateReleaseWithInvalidBranchShaData(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['sha' => null])),
@@ -205,10 +205,10 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Missing required "commit.sha" key for branch "main"');
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateAnnotatedTagWithServerErrorWhenCreatingTag(): void
+    public function testCreateReleaseWithServerErrorWhenCreatingTag(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
@@ -216,11 +216,11 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to create tag object "1.0.0"');
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+        $this->expectExceptionMessage('Failed to create tag object for version "1.0.0", got: "422 Unprocessable Entity"');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateAnnotatedTagWithMissingShaInTagResponse(): void
+    public function testCreateReleaseWithMissingShaInTagResponse(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
@@ -228,11 +228,11 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Missing required "sha" key in tag object returned by GitHub.');
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+        $this->expectExceptionMessage('Missing required "sha" key for tag "1.0.0"');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateAnnotatedTagWithServerErrorWhenCreatingRef(): void
+    public function testCreateReleaseWithServerErrorWhenCreatingRef(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
@@ -241,21 +241,36 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to create tag reference "1.0.0" for sha "tag-sha-456"');
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+        $this->expectExceptionMessage('Failed to create tag reference for version "1.0.0" and sha "tag-sha-456", got: "422 Unprocessable Entity"');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateAnnotatedTag(): void
+    public function testCreateReleaseWithServerErrorWhenCreatingRelease(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+            new Response(422),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to create GitHub release for version "1.0.0", got: "422 Unprocessable Entity"');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
+    }
+
+    public function testCreateRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
             new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
             new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+            new Response(201, [], $this->json(['html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.0'])),
         );
 
-        (new Client($guzzleClient))->createAnnotatedTag(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
 
-        $this->assertCount(3, $history);
+        $this->assertCount(4, $history);
         $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
         $this->assertSame('GET', $history[0]['request']->getMethod());
 
@@ -278,6 +293,15 @@ class ClientTest extends TestCase
         $refPayload = json_decode($body, true);
         $this->assertSame('refs/tags/1.0.0', $refPayload['ref']);
         $this->assertSame('tag-sha-456', $refPayload['sha']);
+
+        $this->assertSame('/repos/owner/repo/releases', (string) $history[3]['request']->getUri());
+        $this->assertSame('POST', $history[3]['request']->getMethod());
+        $body = $history[3]['request']->getBody()->getContents();
+        $this->assertJson($body);
+        /** @var array<string,mixed> */
+        $releasePayload = json_decode($body, true);
+        $this->assertSame('1.0.0', $releasePayload['name']);
+        $this->assertSame('1.0.0', $releasePayload['tag_name']);
     }
 
     public function testGetMergedPullRequestsSkipsDrafts(): void

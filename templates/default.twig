@@ -1,7 +1,5 @@
-## What's Changed
-
 {% for group, prs in groupedPullRequests %}
-### {{ group }}
+## {{ group }}
 {% for pr in prs %}
 * {{ pr.message.type }}: {{ pr.message.description }} by @{{ pr.user.login }} in {{ repository.url }}/pull/{{ pr.number }}
 {% endfor %}
