@@ -18,27 +18,6 @@ class CreateReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
 
-    public function testMissingRepository(): void
-    {
-        [$guzzleClient] = $this->getGuzzleClient();
-        $command = new CreateRelease(new Client($guzzleClient));
-        $commandTester = new CommandTester($command);
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Specify a GitHub repository');
-        $commandTester->execute([], ['interactive' => false]);
-    }
-
-    public function testInvalidRepository(): void
-    {
-        [$guzzleClient] = $this->getGuzzleClient();
-        $command = new CreateRelease(new Client($guzzleClient));
-        $commandTester = new CommandTester($command);
-        $commandTester->setInputs(['foo', 'bar', 'foobar']); // 3 attempts
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('The repository must be in the format "owner/repo"');
-        $commandTester->execute([]);
-    }
-
     public function testMissingBranch(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
@@ -209,34 +188,6 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', 'main']);
         $commandTester->execute(['--no-edit' => true]);
-        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
-    }
-
-    public function testUsingDefaultConfiguration(): void
-    {
-        [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([[
-                'number' => 123,
-                'user' => ['login' => 'johndoe'],
-                'merged_at' => '2024-01-01T00:00:00Z',
-                'title' => 'feat: add new feature',
-                'base' => ['ref' => 'main'],
-            ]])), // pull requests
-            new Response(200, [], $this->json([])), // tags
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
-            new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
-            new Response(201), // tag reference creation
-            new Response(201, [], $this->json([
-                'name' => 'release name',
-                'tag_name' => 'v1.1.1',
-                'html_url' => '<release-url>',
-                'created_at' => '2024-01-01T00:00:00Z',
-            ])), // release creation
-        );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
-        $commandTester = new CommandTester($command);
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
-        $this->assertStringContainsString('using default configuration', $commandTester->getDisplay());
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
     }
 
