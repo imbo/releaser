@@ -44,6 +44,19 @@ final class Client
     }
 
     /**
+     * Get all releases for the given repository.
+     *
+     * @return iterable<Release>
+     */
+    public function getReleases(Repository $repository): iterable
+    {
+        return $this->fetchPaginated(
+            sprintf('/repos/%s/releases?per_page=100', $repository),
+            Release::fromAPI(...),
+        );
+    }
+
+    /**
      * Get all tags for the given repository.
      *
      * @return iterable<Tag>

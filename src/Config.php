@@ -4,6 +4,7 @@ namespace ImboReleaser;
 
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Tag;
 use InvalidArgumentException;
 
@@ -39,6 +40,11 @@ class Config implements ConfigInterface
         return
             in_array($branch->name, self::MAIN_BRANCH_NAMES, true)
             || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/', $branch->name);
+    }
+
+    public function filterRelease(Release $release): bool
+    {
+        return null !== $release->version;
     }
 
     public function filterTag(Tag $tag): bool

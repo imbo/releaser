@@ -97,7 +97,12 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
-            new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
+            new Response(201, [], $this->json([
+                'name' => 'release name',
+                'tag_name' => 'v1.1.1',
+                'html_url' => '<release-url>',
+                'created_at' => '2024-01-01T00:00:00Z',
+            ])), // release creation
         );
         $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
@@ -193,7 +198,12 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
-            new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
+            new Response(201, [], $this->json([
+                'name' => 'release name',
+                'tag_name' => 'v1.1.1',
+                'html_url' => '<release-url>',
+                'created_at' => '2024-01-01T00:00:00Z',
+            ])), // release creation
         );
         $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
@@ -216,7 +226,12 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
-            new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
+            new Response(201, [], $this->json([
+                'name' => 'release name',
+                'tag_name' => 'v1.1.1',
+                'html_url' => '<release-url>',
+                'created_at' => '2024-01-01T00:00:00Z',
+            ])), // release creation
         );
         $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);

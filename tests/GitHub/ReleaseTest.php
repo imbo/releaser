@@ -18,19 +18,34 @@ class ReleaseTest extends TestCase
         return [
             'empty array' => [
                 'data' => [],
-                'error' => 'Missing required "html_url" key',
+                'error' => 'Missing required "name" key',
             ],
-            'missing html_url' => [
+            'missing name' => [
                 'data' => [
                     'id' => 123,
                 ],
-                'error' => 'Missing required "html_url" key',
+                'error' => 'Missing required "name" key',
             ],
-            'non-string html_url' => [
+            'missing tag_name' => [
                 'data' => [
-                    'html_url' => 123,
+                    'name' => 'release name',
+                ],
+                'error' => 'Missing required "tag_name" key',
+            ],
+            'missing html_url' => [
+                'data' => [
+                    'name' => 'release name',
+                    'tag_name' => 'v1.0.0',
                 ],
                 'error' => 'Missing required "html_url" key',
+            ],
+            'missing created_at' => [
+                'data' => [
+                    'name' => 'release name',
+                    'tag_name' => 'v1.0.0',
+                    'html_url' => '<release-url>',
+                ],
+                'error' => 'Missing required "created_at" key',
             ],
         ];
     }
@@ -49,7 +64,19 @@ class ReleaseTest extends TestCase
     public function testFromAPIWithValidData(): void
     {
         $url = 'https://github.com/owner/repo/releases/tag/v1.0.0';
-        $release = Release::fromAPI(['html_url' => $url]);
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.1.1', 'html_url' => $url, 'created_at' => '2024-01-01T00:00:00Z']);
         $this->assertSame($url, $release->htmlUrl);
+    }
+
+    public function testFromAPIWithValidVersion(): void
+    {
+        $release = Release::fromAPI(['name' => '1.1.1', 'tag_name' => '1.2.3', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
+        $this->assertSame('1.2.3', (string) $release->version);
+    }
+
+    public function testFromAPIWithInvalidVersion(): void
+    {
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'invalid-version', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
+        $this->assertNull($release->version);
     }
 }

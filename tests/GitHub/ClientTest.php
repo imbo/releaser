@@ -45,6 +45,31 @@ class ClientTest extends TestCase
         $this->assertSame('http://next-page', (string) $history[1]['request']->getUri());
     }
 
+    public function testGetReleases(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, ['Link' => '<http://next-page>; rel="next"'], $this->json([
+                ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
+                ['name' => 'Release 1.1.0', 'tag_name' => '1.1.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.1.0', 'created_at' => '2026-01-02T00:00:00Z'],
+            ])),
+            new Response(200, [], $this->json([
+                ['name' => 'Release 2.0.0', 'tag_name' => '2.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/2.0.0', 'created_at' => '2026-01-03T00:00:00Z'],
+            ])),
+        );
+
+        $gitHubClient = new Client($guzzleClient);
+        $releases = iterator_to_array($gitHubClient->getReleases(Repository::fromString('owner/repo')));
+
+        $this->assertCount(3, $releases);
+        $this->assertSame('Release 1.0.0', $releases[0]->name);
+        $this->assertSame('Release 1.1.0', $releases[1]->name);
+        $this->assertSame('Release 2.0.0', $releases[2]->name);
+
+        $this->assertCount(2, $history);
+        $this->assertSame('/repos/owner/repo/releases?per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('http://next-page', (string) $history[1]['request']->getUri());
+    }
+
     public function testGetTags(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
@@ -265,7 +290,12 @@ class ClientTest extends TestCase
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
             new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
             new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
-            new Response(201, [], $this->json(['html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.0'])),
+            new Response(201, [], $this->json([
+                'name' => 'release name',
+                'tag_name' => 'v1.1.1',
+                'html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.0',
+                'created_at' => '2024-01-01T00:00:00Z',
+            ])),
         );
 
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
