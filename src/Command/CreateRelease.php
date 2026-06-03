@@ -149,7 +149,7 @@ class CreateRelease extends Command
     }
 
     /**
-     * Execute the application's main logic.
+     * Execute the commands main logic.
      *
      * @return int The exit code of the command (0 for success, non-zero for failure)
      *
