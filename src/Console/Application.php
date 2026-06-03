@@ -2,7 +2,7 @@
 
 namespace ImboReleaser\Console;
 
-use ImboReleaser\Command\Release;
+use ImboReleaser\Command;
 use ImboReleaser\GitHub\Client;
 use Symfony\Component\Console\Application as BaseApplication;
 
@@ -12,6 +12,6 @@ class Application extends BaseApplication
     public function __construct(Client $gitHubClient)
     {
         parent::__construct('Imbo releaser');
-        $this->addCommand(new Release($gitHubClient));
+        $this->addCommand(new Command\CreateRelease($gitHubClient));
     }
 }

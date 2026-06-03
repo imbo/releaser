@@ -13,15 +13,15 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
 
-#[CoversClass(Release::class)]
-class ReleaseTest extends TestCase
+#[CoversClass(CreateRelease::class)]
+class CreateReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
 
     public function testMissingRepository(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Specify a GitHub repository');
@@ -31,7 +31,7 @@ class ReleaseTest extends TestCase
     public function testInvalidRepository(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['foo', 'bar', 'foobar']); // 3 attempts
         $this->expectException(InvalidArgumentException::class);
@@ -42,7 +42,7 @@ class ReleaseTest extends TestCase
     public function testMissingBranch(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Specify a branch');
@@ -57,7 +57,7 @@ class ReleaseTest extends TestCase
                 ['name' => 'v1.x'],
             ])),
         );
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['foo', 'bar', 'baz']); // 3 attempts
         $this->expectException(InvalidArgumentException::class);
@@ -72,7 +72,7 @@ class ReleaseTest extends TestCase
                 ['name' => 'develop'],
             ])),
         );
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No valid branches found in the repository');
@@ -99,12 +99,12 @@ class ReleaseTest extends TestCase
             new Response(201), // tag reference creation
             new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
         );
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['yes']); // release confirmation
         $commandTester->execute(['--repository' => 'owner/repo', '--no-edit' => true]);
         $this->assertStringContainsString('Only one branch available (main)', $commandTester->getDisplay());
-        $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertCount(7, $history);
 
         $req = $history[0]['request'];
@@ -195,11 +195,11 @@ class ReleaseTest extends TestCase
             new Response(201), // tag reference creation
             new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
         );
-        $command = new Release(new Client($guzzleClient));
+        $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', 'main']);
         $commandTester->execute(['--no-edit' => true]);
-        $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
     }
 
     public function testUsingDefaultConfiguration(): void
@@ -218,11 +218,11 @@ class ReleaseTest extends TestCase
             new Response(201), // tag reference creation
             new Response(201, [], $this->json(['id' => 1, 'html_url' => '<release-url>'])), // release creation
         );
-        $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
         $this->assertStringContainsString('using default configuration', $commandTester->getDisplay());
-        $this->assertSame(Release::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
     }
 
     public function testNoPullRequests(): void
@@ -237,7 +237,7 @@ class ReleaseTest extends TestCase
             ])), // commits
             new Response(200, [], $this->json([])), // pull requests
         );
-        $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No pull requests found, aborting release.');
@@ -256,7 +256,7 @@ class ReleaseTest extends TestCase
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
         );
-        $command = new Release(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The specified template file "invalid-template" does not exist or is not readable.');

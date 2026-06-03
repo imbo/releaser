@@ -35,11 +35,11 @@ use function is_string;
 use function sprintf;
 
 #[AsCommand(
-    name: 'release',
-    description: 'Release a new version of a project on GitHub',
+    name: 'create-release|create|release',
+    description: 'Create a new release of a project on GitHub',
     help: 'This command will create a new annotated Git tag and a GitHub release with release notes from a branch.',
 )]
-class Release extends Command
+class CreateRelease extends Command
 {
     private const MAX_QUESTION_ATTEMPTS = 3;
     private ConfigInterface $config;
