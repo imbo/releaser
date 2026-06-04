@@ -210,6 +210,94 @@ class CreateReleaseTest extends TestCase
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
     }
 
+    public function testNoPullRequestsSinceLastTag(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: old feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])), // tags
+            new Response(200, [], $this->json([
+                'committer' => ['date' => '2024-01-02T00:00:00Z'],
+            ])), // commit date for tag (after the PR merged_at)
+        );
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No pull requests found for the release.');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+    }
+
+    public function testReleaseWithExistingTag(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 2,
+                'user' => ['login' => 'jane'],
+                'title' => 'fix: a bug',
+                'merged_at' => '2024-02-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ], [
+                'number' => 1,
+                'user' => ['login' => 'john'],
+                'title' => 'feat: initial',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests (descending by date)
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])), // tags
+            new Response(200, [], $this->json([
+                'committer' => ['date' => '2024-01-15T00:00:00Z'],
+            ])), // commit date for tag sha
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(201, [], $this->json(['sha' => 'newTagSha'])), // tag object creation
+            new Response(201), // tag reference creation
+            new Response(201, [], $this->json([
+                'name' => 'v1.0.1',
+                'tag_name' => 'v1.0.1',
+                'html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.1',
+                'created_at' => '2024-02-02T00:00:00Z',
+            ])), // release creation
+        );
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $commandTester->setInputs(['yes']);
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Release created', $commandTester->getDisplay());
+        $this->assertCount(7, $history);
+    }
+
+    public function testUserDeclinesConfirmation(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+        );
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $commandTester->setInputs(['no']);
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringNotContainsString('Release created', $commandTester->getDisplay());
+        $this->assertCount(2, $history);
+    }
+
     public function testInvalidTemplate(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
