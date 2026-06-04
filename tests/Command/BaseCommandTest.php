@@ -20,7 +20,7 @@ class BaseCommandTest extends TestCase
     public function testMissingRepository(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new ListReleases(new Client($guzzleClient));
+        $command = new ListReleases(new Client($guzzleClient), new Resolver(cwd: __DIR__));
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Specify a GitHub repository');
@@ -30,7 +30,7 @@ class BaseCommandTest extends TestCase
     public function testInvalidRepository(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new ListReleases(new Client($guzzleClient));
+        $command = new ListReleases(new Client($guzzleClient), new Resolver(cwd: __DIR__));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['foo', 'bar', 'foobar']);
         $this->expectException(InvalidArgumentException::class);
@@ -45,7 +45,7 @@ class BaseCommandTest extends TestCase
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
             ])),
         );
-        $command = new ListReleases(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = new ListReleases(new Client($guzzleClient), new Resolver(new Config(), cwd: __DIR__));
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
 
