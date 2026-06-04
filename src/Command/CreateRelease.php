@@ -3,11 +3,7 @@
 namespace ImboReleaser\Command;
 
 use DateTimeImmutable;
-use ImboReleaser\Config;
-use ImboReleaser\Config\Resolver;
-use ImboReleaser\ConfigInterface;
 use ImboReleaser\GitHub\Branch;
-use ImboReleaser\GitHub\Client;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\GitHub\Tag;
@@ -23,7 +19,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
-use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use Twig\Environment;
@@ -31,7 +26,6 @@ use Twig\Loader\FilesystemLoader;
 
 use function count;
 use function dirname;
-use function is_string;
 use function sprintf;
 
 #[AsCommand(
@@ -39,42 +33,15 @@ use function sprintf;
     description: 'Create a new release of a project on GitHub',
     help: 'This command will create a new annotated Git tag and a GitHub release with release notes from a branch.',
 )]
-class CreateRelease extends Command
+class CreateRelease extends BaseCommand
 {
-    private const MAX_QUESTION_ATTEMPTS = 3;
-    private ConfigInterface $config;
-    private Resolver $configResolver;
-
-    /**
-     * Construct the command.
-     */
-    public function __construct(private Client $gitHubClient, ?Resolver $configResolver = null)
-    {
-        if (null === $configResolver) {
-            $configResolver = new Resolver(new Config(), getcwd() ?: null);
-        }
-
-        $this->configResolver = $configResolver;
-
-        parent::__construct();
-    }
-
     /**
      * Configure the command options and arguments.
      */
     protected function configure(): void
     {
+        parent::configure();
         $this
-            ->addOption(
-                'config', 'c',
-                InputOption::VALUE_REQUIRED,
-                'Path to the configuration file. If not specified, the command will look for a config file named <info>.imbo-releaser[.dist].php</info> in the current working directory.',
-            )
-            ->addOption(
-                'repository', 'r',
-                InputOption::VALUE_REQUIRED,
-                'The GitHub repository to create a release from (e.g. "<info>imbo/releaser</info>").',
-            )
             ->addOption(
                 'branch', 'b',
                 InputOption::VALUE_REQUIRED,
@@ -99,20 +66,7 @@ class CreateRelease extends Command
      */
     public function initialize(InputInterface $input, OutputInterface $output): void
     {
-        /** @var ?string */
-        $configFile = $input->getOption('config');
-        $this->config = $this->configResolver->getConfig($configFile);
-
-        $configFilePath = $this->configResolver->configFilePath();
-        if (null !== $configFilePath) {
-            $output->writeln(sprintf('Using configuration file: <info>%s</info>', $configFilePath));
-        } else {
-            $output->writeln('No configuration file found, using default configuration');
-        }
-
-        if (null === $input->getOption('repository')) {
-            $input->setOption('repository', $this->config->gitHubRepository());
-        }
+        parent::initialize($input, $output);
 
         if (null === $input->getOption('branch')) {
             $input->setOption('branch', $this->config->branch());
@@ -132,24 +86,19 @@ class CreateRelease extends Command
      */
     public function interact(InputInterface $input, OutputInterface $output): void
     {
-        /** @var ?string */
-        $repository = $input->getOption('repository');
-        if (null === $repository) {
-            $repository = $this->selectRepository($input, $output);
-        }
+        parent::interact($input, $output);
 
         /** @var ?string */
         $branch = $input->getOption('branch');
         if (null === $branch) {
-            $branch = $this->selectBranch(Repository::fromString($repository), $input, $output)->name;
+            $branch = $this->selectBranch($this->getRepository($input), $input, $output)->name;
         }
 
-        $input->setOption('repository', $repository);
         $input->setOption('branch', $branch);
     }
 
     /**
-     * Execute the application's main logic.
+     * Execute the commands main logic.
      *
      * @return int The exit code of the command (0 for success, non-zero for failure)
      *
@@ -157,13 +106,7 @@ class CreateRelease extends Command
      */
     public function execute(InputInterface $input, OutputInterface $output): int
     {
-        /** @var ?string */
-        $repositoryName = $input->getOption('repository');
-        if (null === $repositoryName) {
-            throw new InvalidArgumentException('Specify a GitHub repository using the -r|--repository option or override the getGitHubRepository method in your config.');
-        }
-        $repository = Repository::fromString($repositoryName);
-
+        $repository = $this->getRepository($input);
         /** @var ?string */
         $branchName = $input->getOption('branch');
         if (null === $branchName) {
@@ -252,28 +195,6 @@ class CreateRelease extends Command
         }
 
         return $newContributors;
-    }
-
-    /**
-     * Prompt the user to select a GitHub repository.
-     *
-     * @throws InvalidArgumentException
-     */
-    private function selectRepository(InputInterface $input, OutputInterface $output): string
-    {
-        $question =
-            (new Question('Which repository do you want to create a release for: '))
-            ->setValidator(static function ($answer): string {
-                if (!is_string($answer) || 0 === preg_match('#^[^\s/]+/[^\s/]+$#', $answer)) {
-                    throw new InvalidArgumentException('The repository must be in the format "owner/repo".');
-                }
-
-                return $answer;
-            })
-            ->setMaxAttempts(self::MAX_QUESTION_ATTEMPTS);
-
-        /** @var string */
-        return (new QuestionHelper())->ask($input, $output, $question);
     }
 
     /**

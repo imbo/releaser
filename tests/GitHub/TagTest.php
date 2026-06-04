@@ -53,20 +53,18 @@ class TagTest extends TestCase
         Tag::fromAPI($data);
     }
 
-    public function testFromAPIWithValidSemVerName(): void
+    public function testFromAPIWithValidVersion(): void
     {
         $tag = Tag::fromAPI(['name' => '1.1.1', 'commit' => ['sha' => 'abc123']]);
         $this->assertSame('1.1.1', $tag->name);
         $this->assertSame('abc123', $tag->sha);
         $this->assertSame('1.1.1', (string) $tag);
-        $this->assertNotNull($tag->version);
+        $this->assertSame('1.1.1', (string) $tag->version);
     }
 
-    public function testFromAPIWithInvalidSemVerName(): void
+    public function testFromAPIWithInvalidVersion(): void
     {
         $tag = Tag::fromAPI(['name' => 'some-tag', 'commit' => ['sha' => 'abc123']]);
-        $this->assertSame('some-tag', $tag->name);
-        $this->assertSame('abc123', $tag->sha);
         $this->assertNull($tag->version);
     }
 }

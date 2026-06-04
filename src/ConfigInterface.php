@@ -4,8 +4,8 @@ namespace ImboReleaser;
 
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Tag;
-use ImboReleaser\GitHub\User;
 
 interface ConfigInterface
 {
@@ -33,6 +33,11 @@ interface ConfigInterface
      * Determine whether a branch should be included in the release process.
      */
     public function filterBranch(Branch $branch): bool;
+
+    /**
+     * Determine whether a release should be included when listing releases.
+     */
+    public function filterRelease(Release $release): bool;
 
     /**
      * Determine whether a tag should be included in the release process.
