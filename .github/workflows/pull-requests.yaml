@@ -11,7 +11,7 @@ jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - run: composer install --no-dev
       - run: scripts/conventional-commit-msg.php "${{ github.event.pull_request.title }}"
   tests-and-qa:
@@ -29,7 +29,7 @@ jobs:
           - test
           - cs
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
