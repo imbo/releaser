@@ -75,7 +75,7 @@ class Config implements ConfigInterface
             throw new InvalidArgumentException('The current tag does not have a valid version');
         }
 
-        if (empty($pullRequests)) {
+        if ([] === $pullRequests) {
             throw new InvalidArgumentException('At least one pull request must be provided to determine the next version');
         }
 
@@ -112,7 +112,7 @@ class Config implements ConfigInterface
     {
         $tags = array_values(array_filter($tags, static fn (Tag $tag): bool => null !== $tag->version));
 
-        if (empty($tags)) {
+        if ([] === $tags) {
             return null;
         }
 

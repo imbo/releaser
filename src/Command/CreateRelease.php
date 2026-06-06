@@ -29,12 +29,15 @@ use function dirname;
 use function sprintf;
 
 #[AsCommand(
-    name: 'create-release|create|release',
+    name: CreateRelease::NAME,
+    aliases: ['create', 'release'],
     description: 'Create a new release of a project on GitHub',
     help: 'This command will create a new annotated Git tag and a GitHub release with release notes from a branch.',
 )]
 class CreateRelease extends BaseCommand
 {
+    public const NAME = 'create-release';
+
     /**
      * Configure the command options and arguments.
      */
@@ -91,7 +94,7 @@ class CreateRelease extends BaseCommand
         /** @var ?string */
         $branch = $input->getOption('branch');
         if (null === $branch) {
-            $branch = $this->selectBranch($this->getRepository($input), $input, $output)->name;
+            $branch = (string) $this->selectBranch($this->getRepository($input), $input, $output)->name;
         }
 
         $input->setOption('branch', $branch);
@@ -121,7 +124,7 @@ class CreateRelease extends BaseCommand
         }
 
         $pullRequests = $this->getMergedPullRequests($branch, $repository, $output);
-        if (empty($pullRequests)) {
+        if ([] === $pullRequests) {
             throw new RuntimeException('No pull requests found, aborting release. Either add pull requests, or override the filterPullRequest method in your config.');
         }
 
@@ -144,7 +147,7 @@ class CreateRelease extends BaseCommand
             }
         }
 
-        if (empty($pullRequestsInRelease)) {
+        if ([] === $pullRequestsInRelease) {
             throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
         }
 
@@ -219,7 +222,7 @@ class CreateRelease extends BaseCommand
 
         $progress->finish('Fetched branches');
 
-        if (empty($branches)) {
+        if ([] === $branches) {
             throw new RuntimeException('No valid branches found in the repository. Either add a branch, or override the filterBranch method in your config.');
         }
 

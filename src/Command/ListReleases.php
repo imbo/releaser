@@ -15,12 +15,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 use function sprintf;
 
 #[AsCommand(
-    name: 'list-releases|ls|releases',
+    name: ListReleases::NAME,
+    aliases: ['ls', 'list', 'releases'],
     description: 'List all releases of a project on GitHub',
     help: 'This command will list all releases of a project on GitHub.',
 )]
 class ListReleases extends BaseCommand
 {
+    public const NAME = 'list-releases';
+
     /**
      * Execute the command's main logic.
      *
@@ -30,9 +33,8 @@ class ListReleases extends BaseCommand
      */
     public function execute(InputInterface $input, OutputInterface $output): int
     {
-        $repository = $this->getRepository($input);
-        $releases = $this->getReleases($repository, $output);
-        if (empty($releases)) {
+        $releases = $this->getReleases($this->getRepository($input), $output);
+        if ([] === $releases) {
             throw new RuntimeException('No releases found for the repository.');
         }
 
