@@ -5,12 +5,13 @@ namespace ImboReleaser\GitHub;
 use DateTimeImmutable;
 use ImboReleaser\Version;
 use InvalidArgumentException;
+use Stringable;
 
 use function is_string;
 use function sprintf;
 use function var_export;
 
-final class Release
+final class Release implements Stringable
 {
     public readonly ?Version $version;
 
@@ -21,6 +22,14 @@ final class Release
         } catch (InvalidArgumentException) {
             $this->version = null;
         }
+    }
+
+    /**
+     * Return the version if it could be parsed, otherwise return the tag name.
+     */
+    public function __toString(): string
+    {
+        return null === $this->version ? $this->tagName : (string) $this->version;
     }
 
     /**

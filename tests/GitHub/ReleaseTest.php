@@ -79,4 +79,16 @@ class ReleaseTest extends TestCase
         $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'invalid-version', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
         $this->assertNull($release->version);
     }
+
+    public function testToStringWithValidVersion(): void
+    {
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.2.3', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
+        $this->assertSame('v1.2.3', (string) $release);
+    }
+
+    public function testToStringWithInvalidVersion(): void
+    {
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'not-semver', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
+        $this->assertSame('not-semver', (string) $release);
+    }
 }

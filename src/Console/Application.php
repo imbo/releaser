@@ -16,6 +16,7 @@ class Application extends BaseApplication
         parent::__construct('Imbo releaser');
         $this->setDefaultCommand('commands');
         $this->addCommand(new Command\CreateRelease($gitHubClient));
+        $this->addCommand(new Command\DeleteRelease($gitHubClient));
         $this->addCommand(new Command\ListReleases($gitHubClient));
     }
 

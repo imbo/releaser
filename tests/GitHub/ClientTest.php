@@ -364,6 +364,80 @@ class ClientTest extends TestCase
         $this->assertSame(2, $pullRequests[0]->number);
     }
 
+    public function testDeleteRelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 12345, 'tag_name' => '1.0.0'])),
+            new Response(204),
+        );
+
+        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+
+        $this->assertCount(2, $history);
+        $this->assertSame('/repos/owner/repo/releases/tags/1.0.0', (string) $history[0]['request']->getUri());
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases/12345', (string) $history[1]['request']->getUri());
+        $this->assertSame('DELETE', $history[1]['request']->getMethod());
+    }
+
+    public function testDeleteReleaseWithServerErrorWhenFetchingRelease(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(404),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to find release for version "1.0.0", got: "404 Not Found"');
+        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
+    public function testDeleteReleaseWithMissingId(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['tag_name' => '1.0.0'])),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing required "id" key for release with version "1.0.0"');
+        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
+    public function testDeleteReleaseWithServerErrorWhenDeletingRelease(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 12345, 'tag_name' => '1.0.0'])),
+            new Response(403),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete GitHub release for version "1.0.0", got: "403 Forbidden"');
+        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
+    public function testDeleteTag(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(204),
+        );
+
+        (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+
+        $this->assertCount(1, $history);
+        $this->assertSame('/repos/owner/repo/git/refs/tags/1.0.0', (string) $history[0]['request']->getUri());
+        $this->assertSame('DELETE', $history[0]['request']->getMethod());
+    }
+
+    public function testDeleteTagWithServerError(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(404),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete tag reference "1.0.0", got: "404 Not Found"');
+        (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
     /**
      * @return array{0:GuzzleClient,1:list<array{request:Request,response:Response}>}
      */

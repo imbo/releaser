@@ -14,6 +14,7 @@ use RuntimeException;
 use function array_key_exists;
 use function gettype;
 use function is_array;
+use function is_int;
 use function is_string;
 use function sprintf;
 
@@ -154,6 +155,49 @@ final class Client
         $data = $this->responseToArray($response);
 
         return Release::fromAPI($data);
+    }
+
+    /**
+     * Delete a GitHub release and its associated Git tag.
+     *
+     * @throws RuntimeException
+     */
+    public function deleteRelease(Repository $repository, Version $version): void
+    {
+        try {
+            $response = $this->httpClient->get(sprintf('/repos/%s/releases/tags/%s', $repository, $version));
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        }
+
+        $data = $this->responseToArray($response);
+        $releaseId = $data['id'] ?? null;
+        if (!is_int($releaseId)) {
+            throw new RuntimeException(sprintf('Missing required "id" key for release with version "%s"', $version));
+        }
+
+        try {
+            $this->httpClient->delete(sprintf('/repos/%s/releases/%d', $repository, $releaseId));
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        }
+    }
+
+    /**
+     * Delete a Git tag reference from the repository.
+     *
+     * @throws RuntimeException
+     */
+    public function deleteTag(Repository $repository, Version $version): void
+    {
+        try {
+            $this->httpClient->delete(sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
+        } catch (ClientException $e) {
+            $r = $e->getResponse();
+            throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        }
     }
 
     /**
