@@ -367,7 +367,7 @@ class ClientTest extends TestCase
     public function testDeleteRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 12345, 'tag_name' => '1.0.0'])),
+            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => '1.0.0'])),
             new Response(204),
         );
 
@@ -405,7 +405,7 @@ class ClientTest extends TestCase
     public function testDeleteReleaseWithServerErrorWhenDeletingRelease(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 12345, 'tag_name' => '1.0.0'])),
+            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => '1.0.0'])),
             new Response(403),
         );
 
