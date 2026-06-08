@@ -11,42 +11,40 @@ use PHPUnit\Framework\TestCase;
 class ReleaseTest extends TestCase
 {
     /**
-     * @return array<string,array{data:array<mixed>,error:string}>
+     * @return iterable<string,array{data:array<mixed>,error:string}>
      */
-    public static function fromAPIProvider(): array
+    public static function fromAPIProvider(): iterable
     {
-        return [
-            'empty array' => [
-                'data' => [],
-                'error' => 'Missing required "name" key',
+        yield 'empty array' => [
+            'data' => [],
+            'error' => 'Missing required "name" key',
+        ];
+        yield 'missing name' => [
+            'data' => [
+                'id' => 123,
             ],
-            'missing name' => [
-                'data' => [
-                    'id' => 123,
-                ],
-                'error' => 'Missing required "name" key',
+            'error' => 'Missing required "name" key',
+        ];
+        yield 'missing tag_name' => [
+            'data' => [
+                'name' => 'release name',
             ],
-            'missing tag_name' => [
-                'data' => [
-                    'name' => 'release name',
-                ],
-                'error' => 'Missing required "tag_name" key',
+            'error' => 'Missing required "tag_name" key',
+        ];
+        yield 'missing html_url' => [
+            'data' => [
+                'name' => 'release name',
+                'tag_name' => 'v1.0.0',
             ],
-            'missing html_url' => [
-                'data' => [
-                    'name' => 'release name',
-                    'tag_name' => 'v1.0.0',
-                ],
-                'error' => 'Missing required "html_url" key',
+            'error' => 'Missing required "html_url" key',
+        ];
+        yield 'missing created_at' => [
+            'data' => [
+                'name' => 'release name',
+                'tag_name' => 'v1.0.0',
+                'html_url' => '<release-url>',
             ],
-            'missing created_at' => [
-                'data' => [
-                    'name' => 'release name',
-                    'tag_name' => 'v1.0.0',
-                    'html_url' => '<release-url>',
-                ],
-                'error' => 'Missing required "created_at" key',
-            ],
+            'error' => 'Missing required "created_at" key',
         ];
     }
 

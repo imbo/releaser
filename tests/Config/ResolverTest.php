@@ -29,42 +29,40 @@ class ResolverTest extends TestCase
     }
 
     /**
-     * @return array<string,array{default:ConfigInterface,expectedVersion:string,expectedConfigFilePath:?string,cwd:?string,configFile:?string}>
+     * @return iterable<string,array{default:ConfigInterface,expectedVersion:string,expectedConfigFilePath:?string,cwd:?string,configFile:?string}>
      */
-    public static function configResolverProvider(): array
+    public static function configResolverProvider(): iterable
     {
         /** @var ConfigInterface $custom */
         $custom = require dirname(__DIR__).'/fixtures/valid-custom-config-1.php';
 
-        return [
-            'config in cwd' => [
-                'default' => new Config(),
-                'cwd' => dirname(__DIR__).'/fixtures',
-                'configFile' => null,
-                'expectedVersion' => '0.0.0',
-                'expectedConfigFilePath' => 'fixtures/.imbo-releaser.php',
-            ],
-            'default config' => [
-                'default' => new Config(),
-                'cwd' => __DIR__,
-                'configFile' => null,
-                'expectedVersion' => 'v0.1.0',
-                'expectedConfigFilePath' => null,
-            ],
-            'custom config file' => [
-                'default' => new Config(),
-                'cwd' => getcwd() ?: '',
-                'configFile' => dirname(__DIR__).'/fixtures/valid-custom-config-1.php',
-                'expectedVersion' => '1.0.0',
-                'expectedConfigFilePath' => 'fixtures/valid-custom-config-1.php',
-            ],
-            'custom default config' => [
-                'default' => $custom,
-                'cwd' => __DIR__,
-                'configFile' => null,
-                'expectedVersion' => '1.0.0',
-                'expectedConfigFilePath' => null,
-            ],
+        yield 'config in cwd' => [
+            'default' => new Config(),
+            'cwd' => dirname(__DIR__).'/fixtures',
+            'configFile' => null,
+            'expectedVersion' => '0.0.0',
+            'expectedConfigFilePath' => 'fixtures/.imbo-releaser.php',
+        ];
+        yield 'default config' => [
+            'default' => new Config(),
+            'cwd' => __DIR__,
+            'configFile' => null,
+            'expectedVersion' => 'v0.1.0',
+            'expectedConfigFilePath' => null,
+        ];
+        yield 'custom config file' => [
+            'default' => new Config(),
+            'cwd' => getcwd() ?: '',
+            'configFile' => dirname(__DIR__).'/fixtures/valid-custom-config-1.php',
+            'expectedVersion' => '1.0.0',
+            'expectedConfigFilePath' => 'fixtures/valid-custom-config-1.php',
+        ];
+        yield 'custom default config' => [
+            'default' => $custom,
+            'cwd' => __DIR__,
+            'configFile' => null,
+            'expectedVersion' => '1.0.0',
+            'expectedConfigFilePath' => null,
         ];
     }
 

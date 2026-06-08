@@ -11,91 +11,88 @@ use PHPUnit\Framework\TestCase;
 class PullRequestTest extends TestCase
 {
     /**
-     * @return array<string,array{data:array<mixed>,error:string}>
+     * @return iterable<string,array{data:array<mixed>,error:string}>
      */
-    public static function fromAPIProvider(): array
+    public static function fromAPIProvider(): iterable
     {
-        return [
-            'empty array' => [
-                'data' => [],
-                'error' => 'Missing required "number" key:',
+        yield 'empty array' => [
+            'data' => [],
+            'error' => 'Missing required "number" key:',
+        ];
+        yield 'missing number' => [
+            'data' => [
+                'id' => 123,
             ],
-            'missing number' => [
-                'data' => [
-                    'id' => 123,
+            'error' => 'Missing required "number" key:',
+        ];
+        yield 'missing user' => [
+            'data' => [
+                'number' => 123,
+            ],
+            'error' => 'Missing required "user" key:',
+        ];
+        yield 'missing user.login' => [
+            'data' => [
+                'number' => 123,
+                'user' => [],
+            ],
+            'error' => 'Missing required "user.login" key:',
+        ];
+        yield 'missing title' => [
+            'data' => [
+                'number' => 123,
+                'user' => [
+                    'login' => 'johndoe',
                 ],
-                'error' => 'Missing required "number" key:',
             ],
-            'missing user' => [
-                'data' => [
-                    'number' => 123,
+            'error' => 'Missing required "title" key:',
+        ];
+        yield 'missing merged_at' => [
+            'data' => [
+                'number' => 123,
+                'user' => [
+                    'login' => 'johndoe',
                 ],
-                'error' => 'Missing required "user" key:',
+                'title' => 'feat: add new feature',
             ],
-            'missing user.login' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [],
+            'error' => 'Missing required "merged_at" key:',
+        ];
+        yield 'missing base' => [
+            'data' => [
+                'number' => 123,
+                'user' => [
+                    'login' => 'johndoe',
                 ],
-                'error' => 'Missing required "user.login" key:',
+                'title' => 'feat: add new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
             ],
-            'missing title' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [
-                        'login' => 'johndoe',
-                    ],
+            'error' => 'Missing required "base" key:',
+        ];
+        yield 'missing base.ref' => [
+            'data' => [
+                'number' => 123,
+                'user' => [
+                    'login' => 'johndoe',
                 ],
-                'error' => 'Missing required "title" key:',
+                'title' => 'feat: add new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => [],
             ],
-            'missing merged_at' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [
-                        'login' => 'johndoe',
-                    ],
-                    'title' => 'feat: add new feature',
+            'error' => 'Missing required "base.ref" key:',
+        ];
+        yield 'invalid merged_at' => [
+            'data' => [
+                'number' => 123,
+                'user' => [
+                    'login' => 'johndoe',
                 ],
-                'error' => 'Missing required "merged_at" key:',
-            ],
-            'missing base' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [
-                        'login' => 'johndoe',
-                    ],
-                    'title' => 'feat: add new feature',
-                    'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: add new feature',
+                'merged_at' => 'invalid-date',
+                'base' => [
+                    'ref' => 'main',
                 ],
-                'error' => 'Missing required "base" key:',
             ],
-            'missing base.ref' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [
-                        'login' => 'johndoe',
-                    ],
-                    'title' => 'feat: add new feature',
-                    'merged_at' => '2024-01-01T00:00:00Z',
-                    'base' => [],
-                ],
-                'error' => 'Missing required "base.ref" key:',
-            ],
-
-            'invalid merged_at' => [
-                'data' => [
-                    'number' => 123,
-                    'user' => [
-                        'login' => 'johndoe',
-                    ],
-                    'title' => 'feat: add new feature',
-                    'merged_at' => 'invalid-date',
-                    'base' => [
-                        'ref' => 'main',
-                    ],
-                ],
-                'error' => 'Invalid "merged_at" value:',
-            ],
+            'error' => 'Invalid "merged_at" value:',
         ];
     }
 

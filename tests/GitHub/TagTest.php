@@ -11,34 +11,32 @@ use PHPUnit\Framework\TestCase;
 class TagTest extends TestCase
 {
     /**
-     * @return array<string,array{data:array<mixed>,error:string}>
+     * @return iterable<string,array{data:array<mixed>,error:string}>
      */
-    public static function fromAPIProvider(): array
+    public static function fromAPIProvider(): iterable
     {
-        return [
-            'empty array' => [
-                'data' => [],
-                'error' => 'Missing required "name" key',
+        yield 'empty array' => [
+            'data' => [],
+            'error' => 'Missing required "name" key',
+        ];
+        yield 'missing name' => [
+            'data' => [
+                'tag' => '1.1.1',
             ],
-            'missing name' => [
-                'data' => [
-                    'tag' => '1.1.1',
-                ],
-                'error' => 'Missing required "name" key',
+            'error' => 'Missing required "name" key',
+        ];
+        yield 'missing commit' => [
+            'data' => [
+                'name' => 'v1.1.1',
             ],
-            'missing commit' => [
-                'data' => [
-                    'name' => 'v1.1.1',
-                ],
-                'error' => 'Missing required "commit" key',
+            'error' => 'Missing required "commit" key',
+        ];
+        yield 'missing sha' => [
+            'data' => [
+                'name' => 'v1.1.1',
+                'commit' => [],
             ],
-            'missing sha' => [
-                'data' => [
-                    'name' => 'v1.1.1',
-                    'commit' => [],
-                ],
-                'error' => 'Missing required "commit.sha" key',
-            ],
+            'error' => 'Missing required "commit.sha" key',
         ];
     }
 
