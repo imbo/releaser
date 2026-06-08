@@ -6,8 +6,11 @@ declare(strict_types=1);
 namespace ImboReleaser;
 
 use GuzzleHttp\Client as GuzzleHttpClient;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use ImboReleaser\Console\Application;
 use ImboReleaser\GitHub\Client;
+use ImboReleaser\GitHub\Middleware\Retry;
 use ImboReleaser\GitHub\TokenResolver;
 use RuntimeException;
 use Throwable;
@@ -26,7 +29,12 @@ try {
         throw new RuntimeException('Failed to resolve the required GitHub API token. Please make sure to set the "GITHUB_TOKEN" environment variable or authenticate using the GitHub CLI.');
     }
 
+    $retry = new Retry();
+    $handlerStack = HandlerStack::create();
+    $handlerStack->push(Middleware::retry($retry->decide(...), $retry->delay(...)));
+
     $httpClient = new GuzzleHttpClient([
+        'handler' => $handlerStack,
         'base_uri' => 'https://api.github.com',
         'headers' => [
             'Accept' => 'application/vnd.github+json',
