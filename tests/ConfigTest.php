@@ -37,30 +37,28 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return list<array{branchName:string,valid:bool}>
+     * @return iterable<string,array{branchName:string,valid:bool}>
      */
-    public static function filterBranchProvider(): array
+    public static function filterBranchProvider(): iterable
     {
-        return [
-            ['branchName' => 'main', 'valid' => true],
-            ['branchName' => '1', 'valid' => true],
-            ['branchName' => '1.x', 'valid' => true],
-            ['branchName' => '1.0.x', 'valid' => true],
-            ['branchName' => 'v1', 'valid' => true],
-            ['branchName' => 'v1.x', 'valid' => true],
-            ['branchName' => 'v1.0.x', 'valid' => true],
-            ['branchName' => '123', 'valid' => true],
-            ['branchName' => '123.x', 'valid' => true],
-            ['branchName' => '123.456.x', 'valid' => true],
-            ['branchName' => 'v123', 'valid' => true],
-            ['branchName' => 'v123.x', 'valid' => true],
-            ['branchName' => 'v123.456.x', 'valid' => true],
-            ['branchName' => '1.0.0', 'valid' => false],
-            ['branchName' => 'v1.0.0', 'valid' => false],
-            ['branchName' => 'dev', 'valid' => false],
-            ['branchName' => 'develop', 'valid' => false],
-            ['branchName' => 'feature-branch', 'valid' => false],
-        ];
+        yield 'main' => ['branchName' => 'main', 'valid' => true];
+        yield '1' => ['branchName' => '1', 'valid' => true];
+        yield '1.x' => ['branchName' => '1.x', 'valid' => true];
+        yield '1.0.x' => ['branchName' => '1.0.x', 'valid' => true];
+        yield 'v1' => ['branchName' => 'v1', 'valid' => true];
+        yield 'v1.x' => ['branchName' => 'v1.x', 'valid' => true];
+        yield 'v1.0.x' => ['branchName' => 'v1.0.x', 'valid' => true];
+        yield '123' => ['branchName' => '123', 'valid' => true];
+        yield '123.x' => ['branchName' => '123.x', 'valid' => true];
+        yield '123.456.x' => ['branchName' => '123.456.x', 'valid' => true];
+        yield 'v123' => ['branchName' => 'v123', 'valid' => true];
+        yield 'v123.x' => ['branchName' => 'v123.x', 'valid' => true];
+        yield 'v123.456.x' => ['branchName' => 'v123.456.x', 'valid' => true];
+        yield '1.0.0' => ['branchName' => '1.0.0', 'valid' => false];
+        yield 'v1.0.0' => ['branchName' => 'v1.0.0', 'valid' => false];
+        yield 'dev' => ['branchName' => 'dev', 'valid' => false];
+        yield 'develop' => ['branchName' => 'develop', 'valid' => false];
+        yield 'feature-branch' => ['branchName' => 'feature-branch', 'valid' => false];
     }
 
     #[DataProvider('filterBranchProvider')]
@@ -70,19 +68,17 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return array<string,array{release:Release,valid:bool}>
+     * @return iterable<string,array{release:Release,valid:bool}>
      */
-    public static function filterReleaseProvider(): array
+    public static function filterReleaseProvider(): iterable
     {
-        return [
-            'no version' => [
-                'release' => new Release('name', 'some-tag-name', 'url', new DateTimeImmutable()),
-                'valid' => false,
-            ],
-            'valid version' => [
-                'release' => new Release('name', 'v1.2.3', 'url', new DateTimeImmutable()),
-                'valid' => true,
-            ],
+        yield 'no version' => [
+            'release' => new Release('name', 'some-tag-name', 'url', new DateTimeImmutable()),
+            'valid' => false,
+        ];
+        yield 'valid version' => [
+            'release' => new Release('name', 'v1.2.3', 'url', new DateTimeImmutable()),
+            'valid' => true,
         ];
     }
 
@@ -93,14 +89,12 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return list<array{tagName:string,valid:bool}>
+     * @return iterable<string,array{tagName:string,valid:bool}>
      */
-    public static function filterTagProvider(): array
+    public static function filterTagProvider(): iterable
     {
-        return [
-            ['tagName' => 'v1.0.0', 'valid' => true],
-            ['tagName' => 'foo', 'valid' => false],
-        ];
+        yield 'v1.0.0' => ['tagName' => 'v1.0.0', 'valid' => true];
+        yield 'foo' => ['tagName' => 'foo', 'valid' => false];
     }
 
     #[DataProvider('filterTagProvider')]
@@ -110,14 +104,12 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return list<array{message:string,valid:bool}>
+     * @return iterable<string,array{message:string,valid:bool}>
      */
-    public static function filterPullRequestProvider(): array
+    public static function filterPullRequestProvider(): iterable
     {
-        return [
-            ['message' => 'feat: add new feature', 'valid' => true],
-            ['message' => 'Some commit message', 'valid' => false],
-        ];
+        yield 'conventional commit' => ['message' => 'feat: add new feature', 'valid' => true];
+        yield 'non-conventional commit' => ['message' => 'Some commit message', 'valid' => false];
     }
 
     #[DataProvider('filterPullRequestProvider')]
@@ -141,51 +133,49 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return array<string,array{current:string,titles:list<string>,expected:string}>
+     * @return iterable<string,array{current:string,titles:list<string>,expected:string}>
      */
-    public static function determineNextVersionProvider(): array
+    public static function determineNextVersionProvider(): iterable
     {
-        return [
-            'no conventional commits' => [
-                'current' => '1.0.0',
-                'titles' => ['some random title'],
-                'expected' => '1.0.1',
+        yield 'no conventional commits' => [
+            'current' => '1.0.0',
+            'titles' => ['some random title'],
+            'expected' => '1.0.1',
+        ];
+        yield 'patch changes' => [
+            'current' => '1.0.0',
+            'titles' => ['fix: some bug'],
+            'expected' => '1.0.1',
+        ];
+        yield 'minor changes' => [
+            'current' => '1.0.0',
+            'titles' => [
+                'fix: some bug',
+                'feat: some feature',
             ],
-            'patch changes' => [
-                'current' => '1.0.0',
-                'titles' => ['fix: some bug'],
-                'expected' => '1.0.1',
+            'expected' => '1.1.0',
+        ];
+        yield 'major changes' => [
+            'current' => '1.0.0',
+            'titles' => [
+                'fix: some bug',
+                'feat: some feature',
+                'feat!: some breaking change',
             ],
-            'minor changes' => [
-                'current' => '1.0.0',
-                'titles' => [
-                    'fix: some bug',
-                    'feat: some feature',
-                ],
-                'expected' => '1.1.0',
-            ],
-            'major changes' => [
-                'current' => '1.0.0',
-                'titles' => [
-                    'fix: some bug',
-                    'feat: some feature',
-                    'feat!: some breaking change',
-                ],
-                'expected' => '2.0.0',
-            ],
-            'major changes with breaking change in body' => [
-                'current' => '1.0.0',
-                'titles' => [
-                    'fix: some bug',
-                    'feat: some feature',
-                    <<<MESSAGE
-                    feat: some breaking change
+            'expected' => '2.0.0',
+        ];
+        yield 'major changes with breaking change in body' => [
+            'current' => '1.0.0',
+            'titles' => [
+                'fix: some bug',
+                'feat: some feature',
+                <<<MESSAGE
+                feat: some breaking change
 
-                    BREAKING CHANGE: this is a breaking change
-                    MESSAGE,
-                ],
-                'expected' => '2.0.0',
+                BREAKING CHANGE: this is a breaking change
+                MESSAGE,
             ],
+            'expected' => '2.0.0',
         ];
     }
 
@@ -203,52 +193,48 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return array<string,array{branchName:string,tagNames:list<string>,expectedTagName:string|null}>
+     * @return iterable<string,array{branchName:string,tagNames:list<string>,expectedTagName:string|null}>
      */
-    public static function getLatestTagForBranchProvider(): array
+    public static function getLatestTagForBranchProvider(): iterable
     {
-        return [
-            'no tags' => [
-                'branchName' => 'main',
-                'tagNames' => [],
-                'expectedTagName' => null,
+        yield 'no tags' => [
+            'branchName' => 'main',
+            'tagNames' => [],
+            'expectedTagName' => null,
+        ];
+        yield 'no valid' => [
+            'branchName' => 'main',
+            'tagNames' => ['some-tag', 'another-tag'],
+            'expectedTagName' => null,
+        ];
+        yield 'main branch' => [
+            'branchName' => 'main',
+            'tagNames' => [
+                'v1.0.0',
+                'v1.1.0',
+                'v2.0.0',
             ],
-
-            'no valid' => [
-                'branchName' => 'main',
-                'tagNames' => ['some-tag', 'another-tag'],
-                'expectedTagName' => null,
+            'expectedTagName' => 'v2.0.0',
+        ];
+        yield 'release branch' => [
+            'branchName' => 'v2',
+            'tagNames' => [
+                'v1.0.0',
+                'v1.1.0',
+                'v2.0.0',
+                'v2.0.1',
+                'v3.0.0',
             ],
-
-            'main branch' => [
-                'branchName' => 'main',
-                'tagNames' => [
-                    'v1.0.0',
-                    'v1.1.0',
-                    'v2.0.0',
-                ],
-                'expectedTagName' => 'v2.0.0',
+            'expectedTagName' => 'v2.0.1',
+        ];
+        yield 'no match' => [
+            'branchName' => 'v2',
+            'tagNames' => [
+                'v1.0.0',
+                'v1.1.0',
+                'v3.0.0',
             ],
-            'release branch' => [
-                'branchName' => 'v2',
-                'tagNames' => [
-                    'v1.0.0',
-                    'v1.1.0',
-                    'v2.0.0',
-                    'v2.0.1',
-                    'v3.0.0',
-                ],
-                'expectedTagName' => 'v2.0.1',
-            ],
-            'no match' => [
-                'branchName' => 'v2',
-                'tagNames' => [
-                    'v1.0.0',
-                    'v1.1.0',
-                    'v3.0.0',
-                ],
-                'expectedTagName' => null,
-            ],
+            'expectedTagName' => null,
         ];
     }
 

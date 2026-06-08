@@ -50,31 +50,29 @@ class VersionTest extends TestCase
     }
 
     /**
-     * @return array<string,array{input:string,expected:string}>
+     * @return iterable<string,array{input:string,expected:string}>
      */
-    public static function fromStringProvider(): array
+    public static function fromStringProvider(): iterable
     {
-        return [
-            'no prefix' => [
-                'input' => '1.2.3',
-                'expected' => '1.2.3',
-            ],
-            'v prefix' => [
-                'input' => 'v1.2.3',
-                'expected' => 'v1.2.3',
-            ],
-            'custom prefix' => [
-                'input' => 'release-1.2.3',
-                'expected' => 'release-1.2.3',
-            ],
-            'multi-digit parts' => [
-                'input' => 'v10.20.30',
-                'expected' => 'v10.20.30',
-            ],
-            'zero version' => [
-                'input' => '0.0.0',
-                'expected' => '0.0.0',
-            ],
+        yield 'no prefix' => [
+            'input' => '1.2.3',
+            'expected' => '1.2.3',
+        ];
+        yield 'v prefix' => [
+            'input' => 'v1.2.3',
+            'expected' => 'v1.2.3',
+        ];
+        yield 'custom prefix' => [
+            'input' => 'release-1.2.3',
+            'expected' => 'release-1.2.3',
+        ];
+        yield 'multi-digit parts' => [
+            'input' => 'v10.20.30',
+            'expected' => 'v10.20.30',
+        ];
+        yield 'zero version' => [
+            'input' => '0.0.0',
+            'expected' => '0.0.0',
         ];
     }
 
@@ -85,27 +83,15 @@ class VersionTest extends TestCase
     }
 
     /**
-     * @return array<string,array{input:string}>
+     * @return iterable<string,array{input:string}>
      */
-    public static function invalidVersionStringProvider(): array
+    public static function invalidVersionStringProvider(): iterable
     {
-        return [
-            'missing patch' => [
-                'input' => '1.2',
-            ],
-            'missing minor and patch' => [
-                'input' => '1',
-            ],
-            'invalid string' => [
-                'input' => 'foo',
-            ],
-            'empty string' => [
-                'input' => '',
-            ],
-            'invalid patch' => [
-                'input' => 'v1.2.x',
-            ],
-        ];
+        yield 'missing patch' => ['input' => '1.2'];
+        yield 'missing minor and patch' => ['input' => '1'];
+        yield 'invalid string' => ['input' => 'foo'];
+        yield 'empty string' => ['input' => ''];
+        yield 'invalid patch' => ['input' => 'v1.2.x'];
     }
 
     #[DataProvider('invalidVersionStringProvider')]

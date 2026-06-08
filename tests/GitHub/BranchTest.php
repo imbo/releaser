@@ -11,21 +11,19 @@ use PHPUnit\Framework\TestCase;
 class BranchTest extends TestCase
 {
     /**
-     * @return array<string,array{data:array<mixed>,error:string}>
+     * @return iterable<string,array{data:array<mixed>,error:string}>
      */
-    public static function fromAPIProvider(): array
+    public static function fromAPIProvider(): iterable
     {
-        return [
-            'empty array' => [
-                'data' => [],
-                'error' => 'Missing required "name" key',
+        yield 'empty array' => [
+            'data' => [],
+            'error' => 'Missing required "name" key',
+        ];
+        yield 'missing required key' => [
+            'data' => [
+                'branch' => 'main',
             ],
-            'missing required key' => [
-                'data' => [
-                    'branch' => 'main',
-                ],
-                'error' => 'Missing required "name" key',
-            ],
+            'error' => 'Missing required "name" key',
         ];
     }
 
