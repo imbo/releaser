@@ -2,24 +2,20 @@
 
 namespace ImboReleaser\GitHub;
 
-use ArrayObject;
-use GuzzleHttp\Client as GuzzleClient;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use ImboReleaser\TestHttpClientTrait;
 use ImboReleaser\Version;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 use const DATE_RFC2822;
-use const JSON_THROW_ON_ERROR;
 
 #[CoversClass(Client::class)]
 class ClientTest extends TestCase
 {
+    use TestHttpClientTrait;
+
     public function testGetBranches(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
@@ -436,27 +432,5 @@ class ClientTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Failed to delete tag reference "1.0.0", got: "404 Not Found"');
         (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
-    }
-
-    /**
-     * @return array{0:GuzzleClient,1:list<array{request:Request,response:Response}>}
-     */
-    private function getGuzzleClient(Response ...$responses): array
-    {
-        /** @var list<Response> $responses */
-        $handlerStack = HandlerStack::create(new MockHandler($responses));
-        $history = new ArrayObject();
-        $handlerStack->push(Middleware::history($history));
-
-        /** @var list<array{request:Request,response:Response}> $history */
-        return [new GuzzleClient(['handler' => $handlerStack]), $history];
-    }
-
-    /**
-     * @param array<mixed> $data
-     */
-    private function json(array $data): string
-    {
-        return json_encode($data, JSON_THROW_ON_ERROR);
     }
 }
