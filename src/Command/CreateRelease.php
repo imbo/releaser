@@ -11,7 +11,6 @@ use ImboReleaser\TemplateData;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
@@ -165,7 +164,7 @@ class CreateRelease extends BaseCommand
 
         $question = new ConfirmationQuestion(sprintf('You are about release "%s". Do you want to continue? (Y/n)', $nextVersion), true);
         if (!(new QuestionHelper())->ask($input, $output, $question)) {
-            return Command::SUCCESS;
+            return self::ABORTED;
         }
 
         $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes);

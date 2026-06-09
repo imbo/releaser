@@ -293,7 +293,7 @@ class CreateReleaseTest extends TestCase
         $commandTester->setInputs(['no']);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
 
-        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertSame(CreateRelease::ABORTED, $commandTester->getStatusCode());
         $this->assertStringNotContainsString('Release created', $commandTester->getDisplay());
         $this->assertCount(2, $history);
     }
