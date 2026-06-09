@@ -18,7 +18,7 @@ class ResolverTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('does not return a valid configuration');
-        (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/invalid-custom-config-1.php');
+        (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/invalid-custom-config.php');
     }
 
     public function testLoadMissingConfigFile(): void
