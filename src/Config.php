@@ -15,14 +15,17 @@ use const DIRECTORY_SEPARATOR;
 
 class Config implements ConfigInterface
 {
-    protected const INITIAL_VERSION = 'v0.1.0';
-    protected const USERNAMES_TO_EXCLUDE = ['dependabot[bot]'];
-    protected const MAIN_BRANCH_NAMES = ['main', 'master'];
-    protected const PULL_REQUEST_LABELS_TO_EXCLUDE = ['skip-release'];
+    protected const string INITIAL_VERSION = 'v0.1.0';
+    /** @var list<string> */
+    protected const array USERNAMES_TO_EXCLUDE = ['dependabot[bot]'];
+    /** @var list<string> */
+    protected const array MAIN_BRANCH_NAMES = ['main', 'master'];
+    /** @var list<string> */
+    protected const array PULL_REQUEST_LABELS_TO_EXCLUDE = ['skip-release'];
 
     public function initialVersion(): Version
     {
-        return Version::fromString(self::INITIAL_VERSION);
+        return Version::fromString(static::INITIAL_VERSION);
     }
 
     public function gitHubRepository(): ?string
@@ -38,7 +41,7 @@ class Config implements ConfigInterface
     public function filterBranch(Branch $branch): bool
     {
         return
-            in_array($branch->name, self::MAIN_BRANCH_NAMES, true)
+            in_array($branch->name, static::MAIN_BRANCH_NAMES, true)
             || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/', $branch->name);
     }
 
@@ -56,8 +59,8 @@ class Config implements ConfigInterface
     {
         return
             null !== $pullRequest->message
-            && !in_array($pullRequest->user->login, self::USERNAMES_TO_EXCLUDE, true)
-            && empty(array_intersect(self::PULL_REQUEST_LABELS_TO_EXCLUDE, $pullRequest->labels));
+            && !in_array($pullRequest->user->login, static::USERNAMES_TO_EXCLUDE, true)
+            && empty(array_intersect(static::PULL_REQUEST_LABELS_TO_EXCLUDE, $pullRequest->labels));
     }
 
     /**
@@ -138,7 +141,7 @@ class Config implements ConfigInterface
 
     private function isMainBranch(Branch $branch): bool
     {
-        return in_array($branch->name, self::MAIN_BRANCH_NAMES, true);
+        return in_array($branch->name, static::MAIN_BRANCH_NAMES, true);
     }
 
     public function pullRequestGroups(): array
