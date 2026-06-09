@@ -140,7 +140,7 @@ class CreateRelease extends BaseCommand
             $pullRequestsInRelease = [];
             foreach ($pullRequests as $pullRequest) {
                 if ($pullRequest->mergedAt <= $since) {
-                    break;
+                    continue;
                 }
 
                 $pullRequestsInRelease[] = $pullRequest;
