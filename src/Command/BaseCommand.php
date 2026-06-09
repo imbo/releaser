@@ -20,7 +20,16 @@ use function sprintf;
 
 abstract class BaseCommand extends Command
 {
-    protected const MAX_QUESTION_ATTEMPTS = 3;
+    /**
+     * Exit code indicating that the command was aborted by the user.
+     */
+    public const int ABORTED = 3;
+
+    /**
+     * Maximum number of attempts for asking a question.
+     */
+    protected const int MAX_QUESTION_ATTEMPTS = 3;
+
     protected ConfigInterface $config;
     protected Resolver $configResolver;
 
