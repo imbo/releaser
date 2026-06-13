@@ -163,7 +163,9 @@ class CreateRelease extends BaseCommand
         }
 
         $question = new ConfirmationQuestion(sprintf('You are about release "%s". Do you want to continue? (Y/n)', $nextVersion), true);
-        if (!(new QuestionHelper())->ask($input, $output, $question)) {
+        if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
+            $output->writeln('Aborting.');
+
             return self::ABORTED;
         }
 

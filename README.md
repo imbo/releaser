@@ -66,7 +66,7 @@ This command prints a table of the existing releases in the repository, includin
 imbo-releaser delete-release --help # alises: rm, delete
 ```
 
-This command deletes a GitHub release and, by default, its associated Git tag. Pass `--keep-tag` to delete only the release and keep the tag. If no version is given, you are prompted to select a release to delete.
+This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
 
 ## Configuration
 

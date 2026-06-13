@@ -34,6 +34,8 @@ final class Client
     /**
      * Get all branches for the given repository.
      *
+     * @see https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#list-branches
+     *
      * @return iterable<Branch>
      */
     public function getBranches(Repository $repository): iterable
@@ -47,6 +49,8 @@ final class Client
     /**
      * Get all releases for the given repository.
      *
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#list-releases
+     *
      * @return iterable<Release>
      */
     public function getReleases(Repository $repository): iterable
@@ -59,6 +63,8 @@ final class Client
 
     /**
      * Get all tags for the given repository.
+     *
+     * @see https://docs.github.com/en/rest/repos/repos?apiVersion=2026-03-10#list-repository-tags
      *
      * @return iterable<Tag>
      */
@@ -76,6 +82,8 @@ final class Client
      * Drafts and pull requests missing either a user or a merged timestamp are skipped.
      *
      * The returned pull requests are sorted by creation date in descending order.
+     *
+     * @see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests
      *
      * @return iterable<PullRequest>
      */
@@ -99,6 +107,8 @@ final class Client
 
     /**
      * Get the commit timestamp for a given SHA in the specified repository.
+     *
+     * @see https://docs.github.com/en/rest/git/commits?apiVersion=2026-03-10#get-a-commit-object
      *
      * @throws RuntimeException
      */
@@ -128,6 +138,8 @@ final class Client
 
     /**
      * Create a GitHub release.
+     *
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#create-a-release
      */
     public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes): Release
     {
@@ -159,6 +171,9 @@ final class Client
 
     /**
      * Delete a GitHub release and its associated Git tag.
+     *
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-a-release-by-tag-name
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#delete-a-release
      *
      * @throws RuntimeException
      */
@@ -203,6 +218,9 @@ final class Client
     /**
      * Create an annotated tag in the specified repository, pointing to the given branch.
      *
+     * @see https://docs.github.com/en/rest/git/tags?apiVersion=2026-03-10#create-a-tag-object
+     * @see https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
+     *
      * @throws RuntimeException
      */
     private function createAnnotatedTag(Repository $repository, Branch $branch, Version $version, string $releaseNotes): void
@@ -246,6 +264,8 @@ final class Client
 
     /**
      * Get the commit SHA for the head of the specified branch in the given repository.
+     *
+     * @see https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
      *
      * @throws RuntimeException
      */

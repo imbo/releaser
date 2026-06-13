@@ -12,9 +12,9 @@ use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 use function sprintf;
 
@@ -35,12 +35,6 @@ class DeleteRelease extends BaseCommand
     {
         parent::configure();
         $this
-            ->addOption(
-                'keep-tag', null,
-                InputOption::VALUE_NEGATABLE,
-                'Keep the Git tag associated with the release you want to delete.',
-                true,
-            )
             ->addArgument(
                 'version', InputArgument::OPTIONAL,
                 sprintf('Which release to delete, identified by its version. If not specified, you will be prompted to select from available releases. You can view available releases using the <info>%s</info> command.', ListReleases::NAME),
@@ -111,13 +105,21 @@ class DeleteRelease extends BaseCommand
         $versionArg = $input->getArgument('version');
         $version = Version::fromString($versionArg);
 
+        $question = new ConfirmationQuestion(sprintf(
+            'You are about to delete release "%s" and its associated Git tag. Do you want to continue? (y/N)',
+            $version,
+        ), false);
+        if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
+            $output->writeln('Aborting.');
+
+            return self::ABORTED;
+        }
+
         $this->gitHubClient->deleteRelease($repository, $version);
         $output->writeln(sprintf('Successfully deleted release <info>%s</info>', $version));
 
-        if (!$input->getOption('keep-tag')) {
-            $this->gitHubClient->deleteTag($repository, $version);
-            $output->writeln(sprintf('Successfully deleted tag <info>%s</info>', $version));
-        }
+        $this->gitHubClient->deleteTag($repository, $version);
+        $output->writeln(sprintf('Successfully deleted tag <info>%s</info>', $version));
 
         return self::SUCCESS;
     }
