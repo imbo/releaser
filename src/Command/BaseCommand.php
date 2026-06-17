@@ -53,7 +53,7 @@ abstract class BaseCommand extends Command
             ->addOption(
                 'config', 'c',
                 InputOption::VALUE_REQUIRED,
-                'Path to the configuration file. If not specified, the command will look for a config file named <info>.imbo-releaser[.dist].php</info> in the current working directory.',
+                'Path to the configuration file. If not specified, the command will look for a config file named <info>.imbo-releaser[.dist].php</info> in the current working directory, falling back to <info>config.php</info> in the <info>imbo-releaser</info> directory of your config home (<info>$XDG_CONFIG_HOME</info> or <info>~/.config</info>).',
             )
             ->addOption(
                 'repository', 'r',

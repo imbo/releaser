@@ -70,7 +70,7 @@ This command deletes a GitHub release and its associated Git tag. If no version 
 
 ## Configuration
 
-To customize behavior, create a file named `.imbo-releaser.php` (or `.imbo-releaser.dist.php`) in your project root. The file must return an instance of `ImboReleaser\ConfigInterface`. The easiest approach is to extend the `ImboReleaser\Config` class and override only what you need:
+To customize behavior, provide a configuration file that returns an instance of `ImboReleaser\ConfigInterface`. The easiest approach is to extend the `ImboReleaser\Config` class, which holds the default configuration values, and override only what you need:
 
 ```php
 <?php declare(strict_types=1);
@@ -90,7 +90,15 @@ return new class extends Config {
 };
 ```
 
-You can also point to an explicit config file using the `--config` / `-c` option.
+### Where the configuration is loaded from
+
+You can point to an explicit config file with the `--config` / `-c` option. Otherwise the configuration is resolved from the following locations, in order, and the first match wins:
+
+1. `.imbo-releaser.php` in the current working directory
+2. `.imbo-releaser.dist.php` in the current working directory
+3. `config.php` in your config home (`$XDG_CONFIG_HOME/imbo-releaser/config.php`, falling back to `~/.config/imbo-releaser/config.php`)
+
+Only the first file found is used; the files are not merged. This lets you keep a personal config in your config home as a fallback for repositories that don't ship their own, while a project-specific file in the working directory takes full precedence when present. If none of these files exist, the built-in defaults are used.
 
 ## Authentication
 
