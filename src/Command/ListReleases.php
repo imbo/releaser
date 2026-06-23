@@ -16,13 +16,12 @@ use function sprintf;
 
 #[AsCommand(
     name: ListReleases::NAME,
-    aliases: ['ls', 'list', 'releases'],
-    description: 'List all releases of a project on GitHub',
+    description: 'List releases',
     help: 'This command will list all releases of a project on GitHub.',
 )]
 class ListReleases extends BaseCommand
 {
-    public const NAME = 'list-releases';
+    public const NAME = 'list';
 
     /**
      * Execute the command's main logic.

@@ -64,6 +64,32 @@ class VersionTest extends TestCase
         );
     }
 
+    public function testReturnsUnknownWhenPrettyVersionIsMissing(): void
+    {
+        InstalledVersions::reload([
+            'root' => [
+                'name' => 'root/package',
+                'pretty_version' => '1.0.0',
+                'version' => '1.0.0.0',
+                'reference' => null,
+                'type' => 'project',
+                'install_path' => __DIR__,
+                'aliases' => [],
+                'dev' => true,
+            ],
+            'versions' => [
+                self::PACKAGE => [
+                    'dev_requirement' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(
+            Version::UNKNOWN_VERSION,
+            (new Version(self::PACKAGE))->getVersion(),
+        );
+    }
+
     public function testIsStringable(): void
     {
         $this->registerPackage([

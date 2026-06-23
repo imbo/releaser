@@ -11,30 +11,21 @@ use Symfony\Component\Console\Command\ListCommand as SymfonyListCommand;
 
 class Application extends BaseApplication
 {
-    /** @codeCoverageIgnore */
     public function __construct(Client $gitHubClient)
     {
         parent::__construct('Imbo releaser', (new Version())->getVersion());
-        $this->setDefaultCommand('commands');
+        $this->addCommand(new Command\Commands());
         $this->addCommand(new Command\CreateRelease($gitHubClient));
         $this->addCommand(new Command\DeleteRelease($gitHubClient));
         $this->addCommand(new Command\ListReleases($gitHubClient));
+        $this->setDefaultCommand(Command\Commands::NAME);
     }
 
-    /**
-     * @return array<SymfonyCommand>
-     */
     protected function getDefaultCommands(): array
     {
-        $defaults = parent::getDefaultCommands();
-
-        foreach ($defaults as $command) {
-            if ($command instanceof SymfonyListCommand) {
-                $command->setName('commands');
-                break;
-            }
-        }
-
-        return $defaults;
+        return array_values(array_filter(
+            parent::getDefaultCommands(),
+            static fn (SymfonyCommand $command): bool => !$command instanceof SymfonyListCommand,
+        ));
     }
 }

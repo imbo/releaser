@@ -29,13 +29,12 @@ use function sprintf;
 
 #[AsCommand(
     name: CreateRelease::NAME,
-    aliases: ['create', 'release'],
-    description: 'Create a new release of a project on GitHub',
+    description: 'Create a new release',
     help: 'This command will create a new annotated Git tag and a GitHub release with release notes from a branch.',
 )]
 class CreateRelease extends BaseCommand
 {
-    public const NAME = 'create-release';
+    public const NAME = 'create';
 
     /**
      * Configure the command options and arguments.
