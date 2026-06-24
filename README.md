@@ -47,7 +47,7 @@ The commands described below share a few common options, most notably `--reposit
 ### Create a new release
 
 ```bash
-imbo-releaser create-release --help # aliases: create, release
+imbo-releaser create --help
 ```
 
 This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created.
@@ -55,7 +55,7 @@ This command calculates the next version, generates release notes from the pull 
 ### List existing releases
 
 ```bash
-imbo-releaser list-releases --help # aliases: ls, list, releases
+imbo-releaser list --help
 ```
 
 This command prints a table of the existing releases in the repository, including the release name, tag name, and release date.
@@ -63,7 +63,7 @@ This command prints a table of the existing releases in the repository, includin
 ### Delete a release
 
 ```bash
-imbo-releaser delete-release --help # alises: rm, delete
+imbo-releaser delete --help
 ```
 
 This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
@@ -113,7 +113,7 @@ If neither source provides a token, the application will exit with an error.
 
 Release notes are generated using [Twig](https://twig.symfony.com/) templates. The built-in default template produces output grouped by Conventional Commit type with contributor attribution.
 
-To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create-release` command.
+To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create` command.
 
 ## Version calculation
 
