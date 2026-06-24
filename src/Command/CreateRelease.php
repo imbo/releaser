@@ -30,7 +30,6 @@ use function sprintf;
 #[AsCommand(
     name: CreateRelease::NAME,
     description: 'Create a new release',
-    help: 'This command will create a new annotated Git tag and a GitHub release with release notes from a branch.',
 )]
 class CreateRelease extends BaseCommand
 {
@@ -46,18 +45,42 @@ class CreateRelease extends BaseCommand
             ->addOption(
                 'branch', 'b',
                 InputOption::VALUE_REQUIRED,
-                'The branch to create a release from. If not specified, the branch will be selected interactively from the list of branches in the repository.',
+                'The branch to create a release from.',
             )
             ->addOption(
                 'template', 't',
                 InputOption::VALUE_REQUIRED,
-                'Path to the Twig template to use for the release notes.',
+                'Path to the Twig template for the release notes.',
             )
             ->addOption(
                 'no-edit', null,
                 InputOption::VALUE_NONE,
-                'Do not open an editor to edit the release notes before creating the release.',
+                'Don\'t edit automatically generated release notes.',
             );
+    }
+
+    protected function commandHelp(): string
+    {
+        return <<<'HELP'
+        This command will create a new annotated Git tag and a GitHub release with
+        release notes from a branch.
+
+        <comment>Branch</comment>
+          The <info>-b|--branch</info> option selects the branch to create a release from. If it is
+          not specified, the value is read from the configuration, and you will be
+          prompted to select one of the repository branches when running
+          interactively.
+
+        <comment>Template</comment>
+          The <info>-t|--template</info> option takes a path to the Twig template used to render
+          the release notes. If it is not specified, the template from the
+          configuration is used.
+
+        <comment>Editing</comment>
+          When running interactively, the rendered release notes are opened in an
+          editor (<info>$VISUAL</info>, <info>$EDITOR</info>, or the configured editor) before the release
+          is created. Pass <info>--no-edit</info> to skip this step.
+        HELP;
     }
 
     /**

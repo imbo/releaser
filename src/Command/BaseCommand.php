@@ -53,13 +53,54 @@ abstract class BaseCommand extends Command
             ->addOption(
                 'config', 'c',
                 InputOption::VALUE_REQUIRED,
-                'Path to the configuration file. If not specified, the command will look for a config file named <info>.imbo-releaser[.dist].php</info> in the current working directory, falling back to <info>config.php</info> in the <info>imbo-releaser</info> directory of your config home (<info>$XDG_CONFIG_HOME</info> or <info>~/.config</info>).',
+                'Path to the configuration file.',
             )
             ->addOption(
                 'repository', 'r',
                 InputOption::VALUE_REQUIRED,
-                'The GitHub repository (e.g. "<info>imbo/releaser</info>").',
-            );
+                'The GitHub repository to operate on.',
+            )
+            ->setHelp($this->buildHelp());
+    }
+
+    /**
+     * Build the help text for the command.
+     *
+     * Subclasses provide a short, command-specific introduction which is combined with the shared
+     * documentation for the common options defined in this base command. Keeping the detailed
+     * explanations here (rather than in the option descriptions) lets <info>--help</info> wrap
+     * cleanly in narrow terminals while the option summaries stay short.
+     */
+    protected function buildHelp(): string
+    {
+        $sharedHelp = <<<'HELP'
+        <comment>Repository</comment>
+          The <info>-r|--repository</info> option takes a repository in the <info>owner/repo</info>
+          format, e.g. <info>imbo/releaser</info>. If it is not specified, the value is read from
+          the configuration, and you will be prompted for it when running
+          interactively.
+
+        <comment>Configuration</comment>
+          The <info>-c|--config</info> option takes a path to a configuration file. If it is not
+          specified, the command looks for a config file named
+          <info>.imbo-releaser[.dist].php</info> in the current working directory, falling back to
+          <info>config.php</info> in the <info>imbo-releaser</info> directory of your config home
+          (<info>$XDG_CONFIG_HOME</info> or <info>~/.config</info>).
+        HELP;
+
+        $intro = $this->commandHelp();
+
+        return '' === $intro ? $sharedHelp : $intro."\n\n".$sharedHelp;
+    }
+
+    /**
+     * Command-specific introduction shown at the top of the help text.
+     *
+     * Override in subclasses to document command-specific behavior and options.
+     */
+    protected function commandHelp(): string
+    {
+        return '';
     }
 
     /**

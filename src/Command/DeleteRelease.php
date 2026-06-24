@@ -21,7 +21,6 @@ use function sprintf;
 #[AsCommand(
     name: DeleteRelease::NAME,
     description: 'Delete a release',
-    help: 'This command will delete a GitHub release and its associated Git tag.',
 )]
 class DeleteRelease extends BaseCommand
 {
@@ -36,8 +35,23 @@ class DeleteRelease extends BaseCommand
         $this
             ->addArgument(
                 'version', InputArgument::OPTIONAL,
-                sprintf('Which release to delete, identified by its version. If not specified, you will be prompted to select from available releases. You can view available releases using the <info>%s</info> command.', ListReleases::NAME),
+                'The version of the release to delete.',
             );
+    }
+
+    protected function commandHelp(): string
+    {
+        return sprintf(
+            <<<'HELP'
+            This command will delete a GitHub release and its associated Git tag.
+
+            <comment>Version</comment>
+              The <info>version</info> argument identifies the release to delete. If it is not
+              specified, you will be prompted to select from the available releases when
+              running interactively. Use the <info>%s</info> command to view the available releases.
+            HELP,
+            ListReleases::NAME,
+        );
     }
 
     /**
