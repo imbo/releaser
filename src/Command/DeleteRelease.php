@@ -20,13 +20,12 @@ use function sprintf;
 
 #[AsCommand(
     name: DeleteRelease::NAME,
-    aliases: ['delete', 'rm'],
-    description: 'Delete a release of a project on GitHub',
+    description: 'Delete a release',
     help: 'This command will delete a GitHub release and its associated Git tag.',
 )]
 class DeleteRelease extends BaseCommand
 {
-    public const NAME = 'delete-release';
+    public const NAME = 'delete';
 
     /**
      * Configure the command options and arguments.
