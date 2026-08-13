@@ -5,7 +5,6 @@ namespace ImboReleaser\GitHub\Middleware;
 use GuzzleHttp\Exception\ConnectException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use Throwable;
 
 final class Retry
 {
@@ -17,7 +16,7 @@ final class Retry
     {
     }
 
-    public function decide(int $retries, RequestInterface $request, ?ResponseInterface $response, ?Throwable $exception): bool
+    public function decide(int $retries, RequestInterface $request, ?ResponseInterface $response, mixed $exception): bool
     {
         if ($retries >= $this->maxRetries) {
             return false;
