@@ -2,13 +2,13 @@
 
 namespace ImboReleaser\Command;
 
+use ImboReleaser\Console\ProgressIndicator;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\Version;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;

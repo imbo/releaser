@@ -3,6 +3,7 @@
 namespace ImboReleaser\Command;
 
 use DateTimeImmutable;
+use ImboReleaser\Console\ProgressIndicator;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Repository;
@@ -11,7 +12,6 @@ use ImboReleaser\TemplateData;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
