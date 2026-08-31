@@ -114,9 +114,17 @@ class DeleteRelease extends BaseCommand
     {
         $repository = $this->getRepository($input);
 
-        /** @var string */
+        /** @var ?string */
         $versionArg = $input->getArgument('version');
-        $version = Version::fromString($versionArg);
+        if (null === $versionArg) {
+            throw new RuntimeException('Specify the version to delete when running non-interactively.');
+        }
+
+        try {
+            $version = Version::fromString($versionArg);
+        } catch (InvalidArgumentException $e) {
+            throw new RuntimeException(sprintf('Invalid version "%s": %s', $versionArg, $e->getMessage()), previous: $e);
+        }
 
         $question = new ConfirmationQuestion(sprintf(
             'You are about to delete release "%s" and its associated Git tag. Do you want to continue? (y/N)',

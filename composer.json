@@ -18,7 +18,7 @@
   "support": {
     "issues": "https://github.com/imbo/releaser/issues",
     "source": "https://github.com/imbo/releaser",
-    "docs": "https://docs.imbo.io"
+    "docs": "https://github.com/imbo/releaser"
   },
   "require": {
     "php": ">=8.3",

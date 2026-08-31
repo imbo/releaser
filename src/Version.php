@@ -33,6 +33,11 @@ final class Version implements Stringable
         return new self($this->prefix, $this->major, $this->minor, $this->patch + 1);
     }
 
+    public function compareTo(self $other): int
+    {
+        return [$this->major, $this->minor, $this->patch] <=> [$other->major, $other->minor, $other->patch];
+    }
+
     /**
      * @throws InvalidArgumentException
      */

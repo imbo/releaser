@@ -21,6 +21,13 @@ class ResolverTest extends TestCase
         (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/invalid-custom-config.php');
     }
 
+    public function testLoadMalformedConfigFile(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('could not be loaded');
+        (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/malformed-config.php');
+    }
+
     public function testLoadMissingConfigFile(): void
     {
         $this->expectException(InvalidArgumentException::class);

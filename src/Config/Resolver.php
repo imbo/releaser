@@ -5,6 +5,7 @@ namespace ImboReleaser\Config;
 use ImboReleaser\Config;
 use ImboReleaser\ConfigInterface;
 use InvalidArgumentException;
+use Throwable;
 
 use function getenv;
 use function is_string;
@@ -139,7 +140,11 @@ final class Resolver
             return null;
         }
 
-        $config = require $file;
+        try {
+            $config = require $file;
+        } catch (Throwable $e) {
+            throw new InvalidArgumentException(sprintf('Config file "%s" could not be loaded: %s', $file, $e->getMessage()), previous: $e);
+        }
 
         return $config instanceof ConfigInterface
             ? [$config, $file]
