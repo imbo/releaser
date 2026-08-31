@@ -8,11 +8,11 @@ use GuzzleHttp\Client as GuzzleHttpClient;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ResponseException;
 use GuzzleHttp\Psr7\Header;
+use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\Version;
-use InvalidArgumentException;
 use JsonException;
 use Psr\Http\Message\ResponseInterface;
-use RuntimeException;
 
 use function array_key_exists;
 use function gettype;

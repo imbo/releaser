@@ -4,13 +4,13 @@ namespace ImboReleaser\Command;
 
 use DateTimeImmutable;
 use ImboReleaser\Console\ProgressIndicator;
+use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\GitHub\Tag;
 use ImboReleaser\TemplateData;
-use InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,6 +20,7 @@ use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
+use Throwable;
 use Twig\Environment;
 use Twig\Error\Error as TwigError;
 use Twig\Loader\FilesystemLoader;
@@ -268,8 +269,12 @@ class CreateRelease extends BaseCommand
             ->setMaxAttempts(self::MAX_QUESTION_ATTEMPTS)
             ->setErrorMessage('"%s" is not a valid branch.');
 
-        /** @var Branch */
-        return (new QuestionHelper())->ask($input, $output, $question);
+        try {
+            /** @var Branch */
+            return (new QuestionHelper())->ask($input, $output, $question);
+        } catch (Throwable $e) {
+            throw new InvalidArgumentException($e->getMessage(), previous: $e);
+        }
     }
 
     /**

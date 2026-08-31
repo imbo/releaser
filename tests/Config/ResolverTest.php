@@ -4,7 +4,7 @@ namespace ImboReleaser\Config;
 
 use ImboReleaser\Config;
 use ImboReleaser\ConfigInterface;
-use InvalidArgumentException;
+use ImboReleaser\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

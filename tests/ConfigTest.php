@@ -3,12 +3,12 @@
 namespace ImboReleaser;
 
 use DateTimeImmutable;
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Tag;
 use ImboReleaser\GitHub\User;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

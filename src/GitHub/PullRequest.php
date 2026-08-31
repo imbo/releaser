@@ -4,7 +4,7 @@ namespace ImboReleaser\GitHub;
 
 use DateMalformedStringException;
 use DateTimeImmutable;
-use InvalidArgumentException;
+use ImboReleaser\Exception\InvalidArgumentException;
 use Ramsey\ConventionalCommits\Exception\InvalidCommitMessage;
 use Ramsey\ConventionalCommits\Message;
 use Ramsey\ConventionalCommits\Parser;

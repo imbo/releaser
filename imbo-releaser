@@ -9,10 +9,10 @@ use GuzzleHttp\Client as GuzzleHttpClient;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use ImboReleaser\Console\Application;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\GitHub\Middleware\Retry;
 use ImboReleaser\GitHub\TokenResolver;
-use RuntimeException;
 use Throwable;
 
 use function fwrite;

@@ -3,11 +3,11 @@
 namespace ImboReleaser\GitHub;
 
 use GuzzleHttp\Psr7\Response;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\TestHttpClientTrait;
 use ImboReleaser\Version;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 use const DATE_RFC2822;
 
