@@ -128,6 +128,17 @@ class ClientTest extends TestCase
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
+    public function testFetchPaginatedWithServerErrorResponse(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(500, [], 'Internal Server Error'),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to request data from the GitHub API, got: "500 Internal Server Error"');
+        iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
+    }
+
     public function testFetchPaginatedWithNoJSON(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(

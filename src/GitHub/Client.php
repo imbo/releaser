@@ -5,7 +5,8 @@ namespace ImboReleaser\GitHub;
 use DateMalformedStringException;
 use DateTimeImmutable;
 use GuzzleHttp\Client as GuzzleHttpClient;
-use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ResponseException;
 use GuzzleHttp\Psr7\Header;
 use ImboReleaser\Version;
 use InvalidArgumentException;
@@ -118,9 +119,8 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($e)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -167,9 +167,8 @@ final class Client
                     // 'make_latest' => 'Can be one of: true, false, legacy',
                 ],
             ]);
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -189,9 +188,8 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/releases/tags/%s', $repository, $version));
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -202,9 +200,8 @@ final class Client
 
         try {
             $this->httpClient->delete(sprintf('/repos/%s/releases/%d', $repository, $releaseId));
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
     }
 
@@ -217,9 +214,8 @@ final class Client
     {
         try {
             $this->httpClient->delete(sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
     }
 
@@ -246,9 +242,8 @@ final class Client
                     // 'tagger' => ['name' => '...', 'email' => '...'],
                 ],
             ]);
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to create tag object for version "%s", got: "%s"', $version, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to create tag object for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
         $tagData = $this->responseToArray($response);
@@ -264,9 +259,8 @@ final class Client
                     'sha' => $tagData['sha'],
                 ],
             ]);
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to create tag reference for version "%s" and sha "%s", got: "%s"', $version, $tagData['sha'], $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to create tag reference for version "%s" and sha "%s", got: "%s"', $version, $tagData['sha'], $this->responseStatus($e)), previous: $e);
         }
     }
 
@@ -281,9 +275,8 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/branches/%s', $repository, $branch->name));
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
         }
 
         $data = $this->responseToArray($response);
@@ -343,9 +336,8 @@ final class Client
     {
         try {
             $response = $this->httpClient->get($url);
-        } catch (ClientException $e) {
-            $r = $e->getResponse();
-            throw new RuntimeException(sprintf('Failed to request data from the GitHub API, got: "%s"', $this->responseStatus($r)), previous: $e);
+        } catch (RequestException $e) {
+            throw new RuntimeException(sprintf('Failed to request data from the GitHub API, got: "%s"', $this->responseStatus($e)), previous: $e);
         }
 
         return [$this->responseToArray($response), $this->getNextUrl($response)];
@@ -392,8 +384,14 @@ final class Client
         return $data;
     }
 
-    private function responseStatus(ResponseInterface $response): string
+    private function responseStatus(RequestException $exception): string
     {
+        if (!$exception instanceof ResponseException) {
+            return 'no response';
+        }
+
+        $response = $exception->getResponse();
+
         return sprintf('%d %s', $response->getStatusCode(), $response->getReasonPhrase());
     }
 }
