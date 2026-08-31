@@ -2,8 +2,8 @@
 
 namespace ImboReleaser\GitHub;
 
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Version;
-use InvalidArgumentException;
 use Stringable;
 
 use function is_array;

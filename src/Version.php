@@ -2,7 +2,7 @@
 
 namespace ImboReleaser;
 
-use InvalidArgumentException;
+use ImboReleaser\Exception\InvalidArgumentException;
 use Stringable;
 
 use function sprintf;

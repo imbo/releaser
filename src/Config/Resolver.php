@@ -4,7 +4,7 @@ namespace ImboReleaser\Config;
 
 use ImboReleaser\Config;
 use ImboReleaser\ConfigInterface;
-use InvalidArgumentException;
+use ImboReleaser\Exception\InvalidArgumentException;
 use Throwable;
 
 use function getenv;

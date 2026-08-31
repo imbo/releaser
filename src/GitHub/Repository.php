@@ -2,7 +2,7 @@
 
 namespace ImboReleaser\GitHub;
 
-use InvalidArgumentException;
+use ImboReleaser\Exception\InvalidArgumentException;
 use Stringable;
 
 use function count;

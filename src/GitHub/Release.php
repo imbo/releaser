@@ -4,8 +4,8 @@ namespace ImboReleaser\GitHub;
 
 use DateMalformedStringException;
 use DateTimeImmutable;
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Version;
-use InvalidArgumentException;
 use Stringable;
 
 use function is_string;

@@ -2,7 +2,7 @@
 
 namespace ImboReleaser\Command;
 
-use RuntimeException;
+use ImboReleaser\Exception\RuntimeException;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

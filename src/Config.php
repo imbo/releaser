@@ -2,11 +2,11 @@
 
 namespace ImboReleaser;
 
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Tag;
-use InvalidArgumentException;
 
 use function dirname;
 use function in_array;

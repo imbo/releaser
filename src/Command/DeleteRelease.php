@@ -3,11 +3,11 @@
 namespace ImboReleaser\Command;
 
 use ImboReleaser\Console\ProgressIndicator;
+use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\Version;
-use InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
@@ -16,6 +16,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ChoiceQuestion;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Throwable;
 
 use function sprintf;
 
@@ -110,8 +111,12 @@ class DeleteRelease extends BaseCommand
         $question = new ChoiceQuestion('Select the release to delete:', $releases);
         $question->setMaxAttempts(self::MAX_QUESTION_ATTEMPTS);
 
-        /** @var Release */
-        return (new QuestionHelper())->ask($input, $output, $question);
+        try {
+            /** @var Release */
+            return (new QuestionHelper())->ask($input, $output, $question);
+        } catch (Throwable $e) {
+            throw new InvalidArgumentException($e->getMessage(), previous: $e);
+        }
     }
 
     /**
