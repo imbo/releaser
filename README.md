@@ -46,6 +46,12 @@ Once installed you can see the available commands and documentation by running t
 
 The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. When these are not provided, they are resolved from your [configuration](#configuration) or, in interactive mode, prompted for. Run any command with `--help` to see all available options and arguments.
 
+For non-interactive environments such as CI, pass `--no-interaction` (or `-n`) and provide every value that would otherwise be prompted for. For example:
+
+```bash
+imbo-releaser create --no-interaction --no-edit --repository owner/repo --branch main
+```
+
 ### Create a new release
 
 ```bash
