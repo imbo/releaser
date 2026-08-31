@@ -52,14 +52,14 @@ interface ConfigInterface
     /**
      * Determine the version of the next release.
      *
-     * @param array<PullRequest> $pullRequests
+     * @param list<PullRequest> $pullRequests
      */
     public function determineNextVersion(Tag $currentTag, array $pullRequests): Version;
 
     /**
      * Get the latest version for a given branch.
      *
-     * @param array<Tag> $tags
+     * @param list<Tag> $tags
      */
     public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag;
 

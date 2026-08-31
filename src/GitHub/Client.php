@@ -2,11 +2,13 @@
 
 namespace ImboReleaser\GitHub;
 
+use DateMalformedStringException;
 use DateTimeImmutable;
 use GuzzleHttp\Client as GuzzleHttpClient;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Psr7\Header;
 use ImboReleaser\Version;
+use InvalidArgumentException;
 use JsonException;
 use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
@@ -133,7 +135,13 @@ final class Client
             throw new RuntimeException(sprintf('Missing required "committer.date" key for commit "%s"', $sha));
         }
 
-        return new DateTimeImmutable($dateString);
+        try {
+            $dateTime = new DateTimeImmutable($dateString);
+        } catch (DateMalformedStringException $e) {
+            throw new InvalidArgumentException(sprintf('Invalid "committer.date" value: %s', $dateString), previous: $e);
+        }
+
+        return $dateTime;
     }
 
     /**

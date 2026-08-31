@@ -7,16 +7,31 @@ use ImboReleaser\GitHub\Repository;
 
 class TemplateData
 {
-    /** @codeCoverageIgnore */
     public function __construct(
-        public readonly Version $nextVersion,
-        public readonly Repository $repository,
+        private readonly Version $nextVersion,
+        private readonly Repository $repository,
         /** @var list<PullRequest> */
-        public readonly array $pullRequests,
+        private readonly array $pullRequests,
         /** @var array<string,list<PullRequest>> */
-        public readonly array $groupedPullRequests,
+        private readonly array $groupedPullRequests,
         /** @var array<string,PullRequest> */
-        public readonly array $newContributors,
+        private readonly array $newContributors,
     ) {
+    }
+
+    /**
+     * Return the template context as an associative array.
+     *
+     * @return array{nextVersion:Version,repository:Repository,pullRequests:list<PullRequest>,groupedPullRequests:array<string,list<PullRequest>>,newContributors:array<string,PullRequest>}
+     */
+    public function toContext(): array
+    {
+        return [
+            'nextVersion' => $this->nextVersion,
+            'repository' => $this->repository,
+            'pullRequests' => $this->pullRequests,
+            'groupedPullRequests' => $this->groupedPullRequests,
+            'newContributors' => $this->newContributors,
+        ];
     }
 }

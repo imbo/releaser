@@ -25,7 +25,7 @@ Guidance for coding agents working in this repository.
 ## Repository map
 
 - `imbo-releaser`: CLI entrypoint script
-- `src/Command/Release.php`: Main release workflow command
+- `src/Command/*.php`: Command classes
 - `src/Console/Application.php`: Symfony Console app wiring
 - `src/Config.php`, `src/ConfigInterface.php`, `src/Config/Resolver.php`: configuration defaults and config file loading
 - `src/GitHub/*`: API client and DTOs

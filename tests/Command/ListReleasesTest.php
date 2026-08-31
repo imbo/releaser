@@ -9,7 +9,6 @@ use ImboReleaser\GitHub\Client;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
 
 #[CoversClass(ListReleases::class)]
@@ -24,9 +23,10 @@ class ListReleasesTest extends TestCase
         );
         $command = new ListReleases(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No releases found for the repository.');
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
+
+        $this->assertSame(ListReleases::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('No releases found for the repository.', $commandTester->getDisplay());
     }
 
     public function testListReleases(): void

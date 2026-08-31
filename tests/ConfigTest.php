@@ -104,18 +104,25 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return iterable<string,array{message:string,valid:bool}>
+     * @return iterable<string,array{message:string,user:string,labels:list<string>,valid:bool}>
      */
     public static function filterPullRequestProvider(): iterable
     {
-        yield 'conventional commit' => ['message' => 'feat: add new feature', 'valid' => true];
-        yield 'non-conventional commit' => ['message' => 'Some commit message', 'valid' => false];
+        yield 'conventional commit' => ['message' => 'feat: add new feature', 'user' => 'login', 'labels' => [], 'valid' => true];
+        yield 'non-conventional commit' => ['message' => 'Some commit message', 'user' => 'login', 'labels' => [], 'valid' => false];
+        yield 'excluded label' => ['message' => 'feat: add new feature', 'user' => 'login', 'labels' => ['skip-release'], 'valid' => false];
+        yield 'excluded user' => ['message' => 'feat: add new feature', 'user' => 'dependabot[bot]', 'labels' => [], 'valid' => false];
     }
 
+    /**
+     * @param list<string> $labels
+     */
     #[DataProvider('filterPullRequestProvider')]
-    public function testFilterPullRequest(string $message, bool $valid): void
+    public function testFilterPullRequest(string $message, string $user, array $labels, bool $valid): void
     {
-        $this->assertSame($valid, (new Config())->filterPullRequest(new PullRequest(123, new User('login'), new DateTimeImmutable(), $message, 'main')));
+        $pullRequest = new PullRequest(123, new User($user), new DateTimeImmutable(), $message, 'main', $labels);
+
+        $this->assertSame($valid, (new Config())->filterPullRequest($pullRequest));
     }
 
     public function testDetermineNextVersionWithoutSemVer(): void
@@ -215,6 +222,15 @@ class ConfigTest extends TestCase
                 'v2.0.0',
             ],
             'expectedTagName' => 'v2.0.0',
+        ];
+        yield 'main branch with custom prefix' => [
+            'branchName' => 'main',
+            'tagNames' => [
+                'release-1.0.0',
+                'release-2.0.0',
+                'release-1.1.0',
+            ],
+            'expectedTagName' => 'release-2.0.0',
         ];
         yield 'release branch' => [
             'branchName' => 'v2',

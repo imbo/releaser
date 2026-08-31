@@ -50,6 +50,44 @@ class VersionTest extends TestCase
     }
 
     /**
+     * @return iterable<string,array{version:Version,other:Version,expected:int}>
+     */
+    public static function compareToProvider(): iterable
+    {
+        yield 'major version is lower' => [
+            'version' => new Version(null, 1, 0, 0),
+            'other' => new Version(null, 2, 0, 0),
+            'expected' => -1,
+        ];
+        yield 'minor version is lower' => [
+            'version' => new Version(null, 1, 1, 0),
+            'other' => new Version(null, 1, 2, 0),
+            'expected' => -1,
+        ];
+        yield 'patch version is lower' => [
+            'version' => new Version(null, 1, 2, 3),
+            'other' => new Version(null, 1, 2, 4),
+            'expected' => -1,
+        ];
+        yield 'versions are equal despite different prefixes' => [
+            'version' => new Version('v', 1, 2, 3),
+            'other' => new Version('release-', 1, 2, 3),
+            'expected' => 0,
+        ];
+        yield 'major version is higher' => [
+            'version' => new Version(null, 2, 0, 0),
+            'other' => new Version(null, 1, 0, 0),
+            'expected' => 1,
+        ];
+    }
+
+    #[DataProvider('compareToProvider')]
+    public function testCompareTo(Version $version, Version $other, int $expected): void
+    {
+        $this->assertSame($expected, $version->compareTo($other));
+    }
+
+    /**
      * @return iterable<string,array{input:string,expected:string}>
      */
     public static function fromStringProvider(): iterable

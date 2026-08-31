@@ -40,6 +40,7 @@ abstract class BaseCommand extends Command
         }
 
         $this->configResolver = $configResolver;
+        $this->config = new Config();
 
         parent::__construct();
     }
@@ -86,6 +87,12 @@ abstract class BaseCommand extends Command
           <info>.imbo-releaser[.dist].php</info> in the current working directory, falling back to
           <info>config.php</info> in the <info>imbo-releaser</info> directory of your config home
           (<info>$XDG_CONFIG_HOME</info> or <info>~/.config</info>).
+
+        <comment>Exit codes</comment>
+          <info>0</info> — success
+          <info>1</info> — error
+          <info>2</info> — invalid usage (e.g. missing required argument)
+          <info>3</info> — aborted by the user (e.g. declined a confirmation prompt)
         HELP;
 
         $intro = $this->commandHelp();

@@ -17,6 +17,26 @@ class DeleteReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
 
+    public function testInvalidVersionArgument(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient();
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invalid version "not-a-version"');
+        $commandTester->execute(['--repository' => 'owner/repo', 'version' => 'not-a-version'], ['interactive' => false]);
+    }
+
+    public function testNonInteractiveModeRequiresVersionArgument(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient();
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Specify the version to delete when running non-interactively.');
+        $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
+    }
+
     public function testDeleteRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(

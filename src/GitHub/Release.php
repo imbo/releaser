@@ -2,6 +2,7 @@
 
 namespace ImboReleaser\GitHub;
 
+use DateMalformedStringException;
 use DateTimeImmutable;
 use ImboReleaser\Version;
 use InvalidArgumentException;
@@ -61,6 +62,12 @@ final class Release implements Stringable
             throw new InvalidArgumentException(sprintf('Missing required "created_at" key: %s', var_export($data, true)));
         }
 
-        return new self($name, $tagName, $htmlUrl, new DateTimeImmutable($createdAt));
+        try {
+            $createdAtDateTime = new DateTimeImmutable($createdAt);
+        } catch (DateMalformedStringException $e) {
+            throw new InvalidArgumentException(sprintf('Invalid "created_at" value: %s', $createdAt), previous: $e);
+        }
+
+        return new self($name, $tagName, $htmlUrl, $createdAtDateTime);
     }
 }

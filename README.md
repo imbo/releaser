@@ -34,7 +34,7 @@ Imbo Releaser is designed to be run from the command line. It makes certain assu
 
 The key points regarding how Imbo Releaser works out of the box are as follows:
 
-- Git branches are named `main` or `master` (for development of the latest major version), and `X.x` (e.g. `1.x`) for maintenance of older major versions. The `X.x` branches may contain an optional `v` prefix (e.g. `v1.x`), and does not have to include the `.x` suffix (e.g. `v1`).
+- Git branches are named `main` or `master` (for development of the latest major version), and `X.x` (e.g. `1.x`) or `X.Y.x` (e.g. `1.2.x`) for maintenance releases. Maintenance branches may contain an optional `v` prefix (e.g. `v1.x` or `v1.2.x`), and do not have to include the `.x` suffix (e.g. `v1` or `v1.2`).
 - Git tags are named `X.Y.Z` (e.g. `1.0.0`). Tags may also contain an optional `v` prefix (e.g. `v1.0.0`).
 - Only pull requests are used when generating release notes and calculating the next version to release. Commits pushed directly to branches are ignored. The pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 - Release notes are attached to the GitHub release and annotated tags, and are not committed to the repository.
@@ -67,6 +67,15 @@ imbo-releaser delete --help
 ```
 
 This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
+
+## Exit codes
+
+| Code | Meaning                                                   |
+| ---- | --------------------------------------------------------- |
+| `0`  | Success                                                   |
+| `1`  | Error                                                     |
+| `2`  | Invalid usage (e.g. missing required argument)            |
+| `3`  | Aborted by the user (e.g. declined a confirmation prompt) |
 
 ## Configuration
 
@@ -114,6 +123,18 @@ If neither source provides a token, the application will exit with an error.
 Release notes are generated using [Twig](https://twig.symfony.com/) templates. The built-in default template produces output grouped by Conventional Commit type with contributor attribution.
 
 To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create` command.
+
+### Available template variables
+
+The following variables are available in all templates:
+
+| Variable              | Type                              | Description                                                                                                                             |
+| --------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `nextVersion`         | `Version`                         | The next version being released (e.g. `1.2.0`)                                                                                          |
+| `repository`          | `Repository`                      | The GitHub repository                                                                                                                   |
+| `pullRequests`        | `PullRequest[]`                   | All filtered pull requests included in this release                                                                                     |
+| `groupedPullRequests` | `array<string,list<PullRequest>>` | Pull requests grouped by their Conventional Commit type label, as defined by `pullRequestGroups()` and `fallbackGroup()` in your config |
+| `newContributors`     | `array<string,PullRequest>`       | Map of username to their first pull request, for contributors making their first contribution in this release                           |
 
 ## Version calculation
 

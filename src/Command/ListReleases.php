@@ -5,7 +5,6 @@ namespace ImboReleaser\Command;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Repository;
 use InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\Table;
@@ -38,7 +37,9 @@ class ListReleases extends BaseCommand
     {
         $releases = $this->getReleases($this->getRepository($input), $output);
         if ([] === $releases) {
-            throw new RuntimeException('No releases found for the repository.');
+            $output->writeln('<info>No releases found for the repository.</info>');
+
+            return self::SUCCESS;
         }
 
         (new Table($output))

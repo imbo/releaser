@@ -21,6 +21,7 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use Twig\Environment;
+use Twig\Error\Error as TwigError;
 use Twig\Loader\FilesystemLoader;
 
 use function count;
@@ -99,6 +100,10 @@ class CreateRelease extends BaseCommand
         if (null === $input->getOption('template')) {
             $input->setOption('template', $this->config->template());
         }
+
+        /** @var string */
+        $template = $input->getOption('template');
+        $output->writeln(sprintf('Using template: <info>%s</info>', $template), OutputInterface::VERBOSITY_DEBUG);
     }
 
     /**
@@ -184,7 +189,10 @@ class CreateRelease extends BaseCommand
             $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->editor());
         }
 
-        $question = new ConfirmationQuestion(sprintf('You are about release "%s". Do you want to continue? (Y/n)', $nextVersion), true);
+        $question = new ConfirmationQuestion(sprintf(
+            'You are about to release "%s". Do you want to continue? (Y/n)',
+            $nextVersion,
+        ), true);
         if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
             $output->writeln('Aborting.');
 
@@ -338,11 +346,18 @@ class CreateRelease extends BaseCommand
         return array_filter($groupedPullRequests);
     }
 
+    /**
+     * @throws RuntimeException
+     */
     private function generateReleaseNotes(string $template, TemplateData $data): string
     {
         $twig = new Environment(new FilesystemLoader(dirname($template)));
 
-        return $twig->render(basename($template), get_object_vars($data));
+        try {
+            return $twig->render(basename($template), $data->toContext());
+        } catch (TwigError $e) {
+            throw new RuntimeException(sprintf('Failed to render release notes template "%s": %s', $template, $e->getMessage()), previous: $e);
+        }
     }
 
     /**

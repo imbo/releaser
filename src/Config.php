@@ -113,19 +113,26 @@ class Config implements ConfigInterface
 
     public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag
     {
-        $tags = array_values(array_filter($tags, static fn (Tag $tag): bool => null !== $tag->version));
+        $versionedTags = array_values(array_filter($tags, static fn (Tag $tag): bool => null !== $tag->version));
 
-        if ([] === $tags) {
+        if ([] === $versionedTags) {
             return null;
         }
 
-        usort($tags, static fn (Tag $a, Tag $b): int => version_compare((string) $b->version, (string) $a->version));
+        usort($versionedTags, static function (Tag $a, Tag $b): int {
+            if (null === $a->version || null === $b->version) {
+                return 0;
+            }
+
+            return $b->version->compareTo($a->version);
+        });
 
         if ($this->isMainBranch($branch)) {
-            return $tags[0];
+            return $versionedTags[0];
         }
 
-        foreach ($tags as $tag) {
+        foreach ($versionedTags as $tag) {
+            // Match maintenance branches such as v2 or 2.x to tags such as v2.1.0 or 2.1.0.
             if (str_starts_with(ltrim($tag->name, 'v'), ltrim($branch->name, 'v').'.')) {
                 return $tag;
             }
