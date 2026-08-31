@@ -40,6 +40,8 @@ The key points regarding how Imbo Releaser works out of the box are as follows:
 - Release notes are attached to the GitHub release and annotated tags, and are not committed to the repository.
 - It does all repository operations using the GitHub API, and not using a local checkout of your repository.
 
+Other tag prefixes are supported. Override `filterTag()` to include them and, when using maintenance branches, override `getLatestTagForBranch()` to define how the prefix maps to a branch.
+
 Once installed you can see the available commands and documentation by running the `imbo-releaser` script.
 
 The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. When these are not provided, they are resolved from your [configuration](#configuration) or, in interactive mode, prompted for. Run any command with `--help` to see all available options and arguments.

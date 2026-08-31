@@ -39,6 +39,8 @@ final class Version implements Stringable
     }
 
     /**
+     * Parse a semantic version with an optional arbitrary prefix.
+     *
      * @throws InvalidArgumentException
      */
     public static function fromString(string $version): self

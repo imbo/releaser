@@ -59,6 +59,8 @@ interface ConfigInterface
     /**
      * Get the latest version for a given branch.
      *
+     * Override this when your tag-prefix convention requires different maintenance branch matching.
+     *
      * @param list<Tag> $tags
      */
     public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag;
