@@ -33,7 +33,7 @@ class DeleteReleaseTest extends TestCase
         $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Specify the version to delete when running non-interactively.');
+        $this->expectExceptionMessage('Specify the version to delete when running non-interactively or using --tag-only.');
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
     }
 
@@ -56,6 +56,35 @@ class DeleteReleaseTest extends TestCase
         $this->assertCount(3, $history);
         $this->assertSame('/repos/owner/repo/git/refs/tags/1.0.0', (string) $history[2]['request']->getUri());
         $this->assertSame('DELETE', $history[2]['request']->getMethod());
+    }
+
+    public function testDeleteTagOnly(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(204),
+        );
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => '1.0.0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Successfully deleted tag', $commandTester->getDisplay());
+        $this->assertCount(1, $history);
+        $this->assertSame('/repos/owner/repo/git/refs/tags/1.0.0', (string) $history[0]['request']->getUri());
+    }
+
+    public function testReportsRecoveryCommandWhenTagDeletionFails(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])),
+            new Response(204),
+            new Response(500),
+        );
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only 1.0.0');
+        $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0'], ['interactive' => false]);
     }
 
     public function testUserDeclinesDeleteReleaseConfirmation(): void
