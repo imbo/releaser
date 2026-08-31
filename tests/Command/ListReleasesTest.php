@@ -49,6 +49,8 @@ class ListReleasesTest extends TestCase
         $this->assertStringContainsString('1.1.0', $display);
         $this->assertStringContainsString('2026-01-01', $display);
         $this->assertStringContainsString('2026-01-02', $display);
+        $this->assertStringNotContainsString('Fetching releases...', $display);
+        $this->assertStringNotContainsString('Fetched releases', $display);
 
         $this->assertCount(1, $history);
         $this->assertSame('GET', $history[0]['request']->getMethod());

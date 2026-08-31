@@ -2,11 +2,11 @@
 
 namespace ImboReleaser\Command;
 
+use ImboReleaser\Console\ProgressIndicator;
 use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\Repository;
 use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Helper\ProgressIndicator;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
