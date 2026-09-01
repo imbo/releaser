@@ -21,7 +21,24 @@ use function sprintf;
 use const PHP_EOL;
 use const STDERR;
 
-require __DIR__.'/vendor/autoload.php';
+$autoloaders = [
+    __DIR__.'/../../autoload.php',
+    __DIR__.'/../autoload.php',
+    __DIR__.'/vendor/autoload.php',
+];
+$autoloader = null;
+foreach ($autoloaders as $file) {
+    if (file_exists($file)) {
+        $autoloader = $file;
+        break;
+    }
+}
+
+if (null === $autoloader) {
+    throw new RuntimeException('Unable to locate autoload.php file.');
+}
+
+require $autoloader;
 
 try {
     $token = (new TokenResolver())->getGitHubToken();
