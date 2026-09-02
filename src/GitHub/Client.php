@@ -149,7 +149,7 @@ final class Client
      *
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#create-a-release
      */
-    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes): Release
+    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes, ?string $name = null): Release
     {
         $this->createAnnotatedTag($repository, $branch, $version, $releaseNotes);
 
@@ -157,7 +157,7 @@ final class Client
             $response = $this->httpClient->post(sprintf('/repos/%s/releases', $repository), [
                 'json' => [
                     'tag_name' => (string) $version,
-                    'name' => (string) $version,
+                    'name' => $name ?? (string) $version,
                     'body' => $releaseNotes,
                     'generate_release_notes' => false,
 

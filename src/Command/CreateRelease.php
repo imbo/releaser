@@ -55,6 +55,11 @@ class CreateRelease extends BaseCommand
                 'Path to the Twig template for the release notes.',
             )
             ->addOption(
+                'name', null,
+                InputOption::VALUE_REQUIRED,
+                'The name of the GitHub release.',
+            )
+            ->addOption(
                 'no-edit', null,
                 InputOption::VALUE_NONE,
                 'Don\'t edit automatically generated release notes.',
@@ -77,6 +82,10 @@ class CreateRelease extends BaseCommand
           The <info>-t|--template</info> option takes a path to the Twig template used to render
           the release notes. If it is not specified, the template from the
           configuration is used.
+
+        <comment>Name</comment>
+          The <info>--name</info> option sets the name of the GitHub release. If it is not
+          specified, the calculated release version is used.
 
         <comment>Editing</comment>
           When running interactively, the rendered release notes are opened in an
@@ -190,8 +199,11 @@ class CreateRelease extends BaseCommand
             $releaseNotes = $this->editReleaseNotes($releaseNotes, $this->config->editor());
         }
 
+        /** @var ?string */
+        $name = $input->getOption('name') ?? (string) $nextVersion;
         $question = new ConfirmationQuestion(sprintf(
-            'You are about to release "%s". Do you want to continue? (Y/n)',
+            'You are about to create the release "%s" for tag "%s". Do you want to continue? (Y/n)',
+            $name,
             $nextVersion,
         ), true);
         if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
@@ -200,7 +212,7 @@ class CreateRelease extends BaseCommand
             return self::ABORTED;
         }
 
-        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes);
+        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name);
 
         $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));
 
