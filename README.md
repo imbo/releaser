@@ -58,7 +58,7 @@ imbo-releaser create --no-interaction --no-edit --repository owner/repo --branch
 imbo-releaser create --help
 ```
 
-This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created. Pass `--name` to set the GitHub release name; otherwise the calculated version is used.
+This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created. Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
 
 ### List existing releases
 

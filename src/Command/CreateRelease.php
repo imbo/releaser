@@ -60,6 +60,11 @@ class CreateRelease extends BaseCommand
                 'The name of the GitHub release.',
             )
             ->addOption(
+                'draft', null,
+                InputOption::VALUE_NONE,
+                'Create the GitHub release as a draft.',
+            )
+            ->addOption(
                 'no-edit', null,
                 InputOption::VALUE_NONE,
                 'Don\'t edit automatically generated release notes.',
@@ -86,6 +91,9 @@ class CreateRelease extends BaseCommand
         <comment>Name</comment>
           The <info>--name</info> option sets the name of the GitHub release. If it is not
           specified, the calculated release version is used.
+
+        <comment>Draft</comment>
+          Pass <info>--draft</info> to create the GitHub release as a draft.
 
         <comment>Editing</comment>
           When running interactively, the rendered release notes are opened in an
@@ -201,8 +209,11 @@ class CreateRelease extends BaseCommand
 
         /** @var ?string */
         $name = $input->getOption('name') ?? (string) $nextVersion;
+        /** @var bool */
+        $draft = $input->getOption('draft');
         $question = new ConfirmationQuestion(sprintf(
-            'You are about to create the release "%s" for tag "%s". Do you want to continue? (Y/n)',
+            'You are about to create the %srelease "%s" for tag "%s". Do you want to continue? (Y/n)',
+            $draft ? 'draft ' : '',
             $name,
             $nextVersion,
         ), true);
@@ -212,7 +223,7 @@ class CreateRelease extends BaseCommand
             return self::ABORTED;
         }
 
-        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name);
+        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft);
 
         $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));
 

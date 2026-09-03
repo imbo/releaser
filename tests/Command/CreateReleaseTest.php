@@ -88,9 +88,9 @@ class CreateReleaseTest extends TestCase
         $command = new CreateRelease(new Client($guzzleClient));
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['yes']); // release confirmation
-        $commandTester->execute(['--repository' => 'owner/repo', '--no-edit' => true, '--name' => 'Release 0.1']);
+        $commandTester->execute(['--repository' => 'owner/repo', '--no-edit' => true, '--name' => 'Release 0.1', '--draft' => true]);
         $this->assertStringContainsString('Only one branch available (main)', $commandTester->getDisplay());
-        $this->assertStringContainsString('You are about to create the release "Release 0.1" for tag "v0.1.0".', $commandTester->getDisplay());
+        $this->assertStringContainsString('You are about to create the draft release "Release 0.1" for tag "v0.1.0".', $commandTester->getDisplay());
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertCount(7, $history);
 
@@ -159,6 +159,7 @@ class CreateReleaseTest extends TestCase
         $this->assertSame('v0.1.0', $data['tag_name']);
         $this->assertSame($releaseNotes, $data['body']);
         $this->assertFalse($data['generate_release_notes']);
+        $this->assertTrue($data['draft']);
     }
 
     public function testSelectValidRepositoryAndBranch(): void
