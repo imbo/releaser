@@ -305,7 +305,7 @@ class ClientTest extends TestCase
             ])),
         );
 
-        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0');
 
         $this->assertCount(4, $history);
         $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
@@ -337,7 +337,7 @@ class ClientTest extends TestCase
         $this->assertJson($body);
         /** @var array<string,mixed> */
         $releasePayload = json_decode($body, true);
-        $this->assertSame('1.0.0', $releasePayload['name']);
+        $this->assertSame('Release 1.0', $releasePayload['name']);
         $this->assertSame('1.0.0', $releasePayload['tag_name']);
     }
 
