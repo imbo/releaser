@@ -3,7 +3,6 @@
 namespace ImboReleaser\GitHub;
 
 use ImboReleaser\Exception\InvalidArgumentException;
-use ImboReleaser\Version;
 use Stringable;
 
 use function is_array;
@@ -12,15 +11,8 @@ use function sprintf;
 
 final class Tag implements Stringable
 {
-    public readonly ?Version $version;
-
     public function __construct(public readonly string $name, public readonly string $sha)
     {
-        try {
-            $this->version = Version::fromString($this->name);
-        } catch (InvalidArgumentException) {
-            $this->version = null;
-        }
     }
 
     public function __toString(): string

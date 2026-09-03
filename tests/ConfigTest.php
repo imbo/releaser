@@ -7,7 +7,7 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Release;
-use ImboReleaser\GitHub\Tag;
+use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\User;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -88,19 +88,9 @@ class ConfigTest extends TestCase
         $this->assertSame($valid, (new Config())->filterRelease($release));
     }
 
-    /**
-     * @return iterable<string,array{tagName:string,valid:bool}>
-     */
-    public static function filterTagProvider(): iterable
+    public function testFilterTag(): void
     {
-        yield 'v1.0.0' => ['tagName' => 'v1.0.0', 'valid' => true];
-        yield 'foo' => ['tagName' => 'foo', 'valid' => false];
-    }
-
-    #[DataProvider('filterTagProvider')]
-    public function testFilterTag(string $tagName, bool $valid): void
-    {
-        $this->assertSame($valid, (new Config())->filterTag(new Tag($tagName, 'sha')));
+        $this->assertTrue((new Config())->filterTag(new ReleaseTag('v1.0.0', 'sha')));
     }
 
     /**
@@ -125,18 +115,11 @@ class ConfigTest extends TestCase
         $this->assertSame($valid, (new Config())->filterPullRequest($pullRequest));
     }
 
-    public function testDetermineNextVersionWithoutSemVer(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('The current tag does not have a valid version');
-        (new Config())->determineNextVersion(new Tag('some-name', 'sha'), []);
-    }
-
     public function testDetermineNextVersionWithoutPullRequests(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('At least one pull request must be provided to determine the next version');
-        (new Config())->determineNextVersion(new Tag('1.0.0', 'sha'), []);
+        (new Config())->determineNextVersion(new ReleaseTag('1.0.0', 'sha'), []);
     }
 
     /**
@@ -193,7 +176,7 @@ class ConfigTest extends TestCase
     public function testDetermineNextVersion(string $current, array $titles, string $expected): void
     {
         $next = (new Config())->determineNextVersion(
-            new Tag($current, 'sha'),
+            new ReleaseTag($current, 'sha'),
             array_map(static fn (string $title) => new PullRequest(123, new User('login'), new DateTimeImmutable(), $title, 'main'), $titles),
         );
         $this->assertSame($expected, (string) $next);
@@ -207,11 +190,6 @@ class ConfigTest extends TestCase
         yield 'no tags' => [
             'branchName' => 'main',
             'tagNames' => [],
-            'expectedTagName' => null,
-        ];
-        yield 'no valid' => [
-            'branchName' => 'main',
-            'tagNames' => ['some-tag', 'another-tag'],
             'expectedTagName' => null,
         ];
         yield 'main branch' => [
@@ -262,7 +240,7 @@ class ConfigTest extends TestCase
     {
         $tag = (new Config())->getLatestTagForBranch(
             new Branch($branchName),
-            array_map(static fn (string $tagName) => new Tag($tagName, 'sha'), $tagNames),
+            array_map(static fn (string $tagName) => new ReleaseTag($tagName, 'sha'), $tagNames),
         );
         if (null === $expectedTagName) {
             $this->assertNull($tag);
