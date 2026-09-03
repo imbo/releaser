@@ -6,7 +6,7 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Release;
-use ImboReleaser\GitHub\Tag;
+use ImboReleaser\GitHub\ReleaseTag;
 
 use function dirname;
 use function in_array;
@@ -50,9 +50,9 @@ class Config implements ConfigInterface
         return null !== $release->version;
     }
 
-    public function filterTag(Tag $tag): bool
+    public function filterTag(ReleaseTag $tag): bool
     {
-        return null !== $tag->version;
+        return true;
     }
 
     public function filterPullRequest(PullRequest $pullRequest): bool
@@ -72,12 +72,8 @@ class Config implements ConfigInterface
      * - If a pull request is a feature, the minor version is incremented.
      * - Otherwise, the patch version is incremented.
      */
-    public function determineNextVersion(Tag $currentTag, array $pullRequests): Version
+    public function determineNextVersion(ReleaseTag $currentTag, array $pullRequests): Version
     {
-        if (null === $currentTag->version) {
-            throw new InvalidArgumentException('The current tag does not have a valid version');
-        }
-
         if ([] === $pullRequests) {
             throw new InvalidArgumentException('At least one pull request must be provided to determine the next version');
         }
@@ -111,27 +107,21 @@ class Config implements ConfigInterface
         return $currentTag->version->incrementPatch();
     }
 
-    public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag
+    public function getLatestTagForBranch(Branch $branch, array $tags): ?ReleaseTag
     {
-        $versionedTags = array_values(array_filter($tags, static fn (Tag $tag): bool => null !== $tag->version));
-
-        if ([] === $versionedTags) {
+        if ([] === $tags) {
             return null;
         }
 
-        usort($versionedTags, static function (Tag $a, Tag $b): int {
-            if (null === $a->version || null === $b->version) {
-                return 0;
-            }
-
+        usort($tags, static function (ReleaseTag $a, ReleaseTag $b): int {
             return $b->version->compareTo($a->version);
         });
 
         if ($this->isMainBranch($branch)) {
-            return $versionedTags[0];
+            return $tags[0];
         }
 
-        foreach ($versionedTags as $tag) {
+        foreach ($tags as $tag) {
             // Match maintenance branches such as v2 or 2.x to tags such as v2.1.0 or 2.1.0.
             if (str_starts_with(ltrim($tag->name, 'v'), ltrim($branch->name, 'v').'.')) {
                 return $tag;

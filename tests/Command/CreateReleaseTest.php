@@ -72,7 +72,9 @@ class CreateReleaseTest extends TestCase
                 'title' => 'feat: add new feature',
                 'base' => ['ref' => 'main'],
             ]])), // pull requests
-            new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json([
+                ['name' => 'nightly', 'commit' => ['sha' => 'nightlySha']],
+            ])), // tags
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation

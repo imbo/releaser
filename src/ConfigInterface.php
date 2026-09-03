@@ -5,7 +5,7 @@ namespace ImboReleaser;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\Release;
-use ImboReleaser\GitHub\Tag;
+use ImboReleaser\GitHub\ReleaseTag;
 
 interface ConfigInterface
 {
@@ -40,9 +40,9 @@ interface ConfigInterface
     public function filterRelease(Release $release): bool;
 
     /**
-     * Determine whether a tag should be included in the release process.
+     * Determine whether a valid release tag should be included in the release process.
      */
-    public function filterTag(Tag $tag): bool;
+    public function filterTag(ReleaseTag $tag): bool;
 
     /**
      * Determine whether a pull request should be included in the release process.
@@ -54,16 +54,16 @@ interface ConfigInterface
      *
      * @param list<PullRequest> $pullRequests
      */
-    public function determineNextVersion(Tag $currentTag, array $pullRequests): Version;
+    public function determineNextVersion(ReleaseTag $currentTag, array $pullRequests): Version;
 
     /**
      * Get the latest version for a given branch.
      *
      * Override this when your tag-prefix convention requires different maintenance branch matching.
      *
-     * @param list<Tag> $tags
+     * @param list<ReleaseTag> $tags
      */
-    public function getLatestTagForBranch(Branch $branch, array $tags): ?Tag;
+    public function getLatestTagForBranch(Branch $branch, array $tags): ?ReleaseTag;
 
     /**
      * Get the template to use for the release notes.

@@ -8,8 +8,8 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\Repository;
-use ImboReleaser\GitHub\Tag;
 use ImboReleaser\TemplateData;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Helper\QuestionHelper;
@@ -290,7 +290,7 @@ class CreateRelease extends BaseCommand
     }
 
     /**
-     * @return list<Tag>
+     * @return list<ReleaseTag>
      */
     private function getTags(Repository $repository, OutputInterface $output): array
     {
@@ -300,11 +300,17 @@ class CreateRelease extends BaseCommand
         $tags = [];
         foreach ($this->gitHubClient->getTags($repository) as $tag) {
             $progress->advance();
-            if (!$this->config->filterTag($tag)) {
+            try {
+                $releaseTag = ReleaseTag::fromTag($tag);
+            } catch (InvalidArgumentException) {
                 continue;
             }
 
-            $tags[] = $tag;
+            if (!$this->config->filterTag($releaseTag)) {
+                continue;
+            }
+
+            $tags[] = $releaseTag;
         }
 
         $progress->finish('Fetched tags');
