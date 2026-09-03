@@ -109,6 +109,7 @@ class Config implements ConfigInterface
 
     public function getLatestTagForBranch(Branch $branch, array $tags): ?ReleaseTag
     {
+        $tags = array_values(array_filter($tags, static fn (ReleaseTag $tag): bool => !$tag->version->isPrerelease()));
         if ([] === $tags) {
             return null;
         }

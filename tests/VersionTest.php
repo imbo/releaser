@@ -49,6 +49,44 @@ class VersionTest extends TestCase
         $this->assertSame('1.3.0', (string) (new Version(null, 1, 2, 3))->incrementMinor());
     }
 
+    public function testIncrementClearsPrerelease(): void
+    {
+        $version = Version::fromString('v1.2.3-rc.1');
+
+        $this->assertSame('v2.0.0', (string) $version->incrementMajor());
+        $this->assertSame('v1.3.0', (string) $version->incrementMinor());
+        $this->assertSame('v1.2.4', (string) $version->incrementPatch());
+    }
+
+    public function testCanCreatePrerelease(): void
+    {
+        $version = (new Version('v', 1, 2, 3))->withPrerelease('rc', 1);
+
+        $this->assertSame('v1.2.3-rc.1', (string) $version);
+        $this->assertTrue($version->isPrerelease());
+        $this->assertSame(1, $version->prereleaseNumber('rc'));
+        $this->assertNull($version->prereleaseNumber('beta'));
+    }
+
+    /**
+     * @return iterable<string,array{identifier:string,number:int}>
+     */
+    public static function invalidPrereleaseProvider(): iterable
+    {
+        yield 'empty identifier' => ['identifier' => '', 'number' => 1];
+        yield 'invalid identifier character' => ['identifier' => 'rc_1', 'number' => 1];
+        yield 'zero sequence number' => ['identifier' => 'rc', 'number' => 0];
+    }
+
+    #[DataProvider('invalidPrereleaseProvider')]
+    public function testCannotCreatePrereleaseWithInvalidIdentifierOrNumber(string $identifier, int $number): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Invalid prerelease identifier or number: "%s.%d"', $identifier, $number));
+
+        (new Version())->withPrerelease($identifier, $number);
+    }
+
     /**
      * @return iterable<string,array{version:Version,other:Version,expected:int}>
      */
@@ -112,6 +150,10 @@ class VersionTest extends TestCase
             'input' => '0.0.0',
             'expected' => '0.0.0',
         ];
+        yield 'prerelease' => [
+            'input' => 'v1.2.3-rc.1',
+            'expected' => 'v1.2.3-rc.1',
+        ];
     }
 
     #[DataProvider('fromStringProvider')]
@@ -130,6 +172,8 @@ class VersionTest extends TestCase
         yield 'invalid string' => ['input' => 'foo'];
         yield 'empty string' => ['input' => ''];
         yield 'invalid patch' => ['input' => 'v1.2.x'];
+        yield 'empty prerelease' => ['input' => 'v1.2.3-'];
+        yield 'invalid prerelease' => ['input' => 'v1.2.3-rc_1'];
     }
 
     #[DataProvider('invalidVersionStringProvider')]

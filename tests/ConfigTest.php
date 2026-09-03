@@ -201,6 +201,14 @@ class ConfigTest extends TestCase
             ],
             'expectedTagName' => 'v2.0.0',
         ];
+        yield 'main branch selects stable tag over prerelease' => [
+            'branchName' => 'main',
+            'tagNames' => [
+                'v1.0.0',
+                'v1.1.0-rc.1',
+            ],
+            'expectedTagName' => 'v1.0.0',
+        ];
         yield 'main branch with custom prefix' => [
             'branchName' => 'main',
             'tagNames' => [

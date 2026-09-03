@@ -11,6 +11,7 @@ use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\TemplateData;
+use ImboReleaser\Version;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
@@ -65,6 +66,11 @@ class CreateRelease extends BaseCommand
                 'Create the GitHub release as a draft.',
             )
             ->addOption(
+                'prerelease', null,
+                InputOption::VALUE_REQUIRED,
+                'Create a prerelease using the given identifier, such as "rc" or "beta".',
+            )
+            ->addOption(
                 'no-edit', null,
                 InputOption::VALUE_NONE,
                 'Don\'t edit automatically generated release notes.',
@@ -94,6 +100,10 @@ class CreateRelease extends BaseCommand
 
         <comment>Draft</comment>
           Pass <info>--draft</info> to create the GitHub release as a draft.
+
+        <comment>Prerelease</comment>
+          The <info>--prerelease</info> option creates a prerelease with the given identifier.
+          For example, <info>--prerelease rc</info> creates tags such as <info>v1.2.3-rc.1</info>.
 
         <comment>Editing</comment>
           When running interactively, the rendered release notes are opened in an
@@ -191,6 +201,12 @@ class CreateRelease extends BaseCommand
             }
         }
 
+        /** @var ?string */
+        $prereleaseIdentifier = $input->getOption('prerelease');
+        if (null !== $prereleaseIdentifier) {
+            $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $tags);
+        }
+
         if ([] === $pullRequestsInRelease) {
             throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
         }
@@ -211,9 +227,15 @@ class CreateRelease extends BaseCommand
         $name = $input->getOption('name') ?? (string) $nextVersion;
         /** @var bool */
         $draft = $input->getOption('draft');
+        $releaseType = match (true) {
+            $draft && null !== $prereleaseIdentifier => 'draft prerelease',
+            $draft => 'draft release',
+            null !== $prereleaseIdentifier => 'prerelease',
+            default => 'release',
+        };
         $question = new ConfirmationQuestion(sprintf(
-            'You are about to create the %srelease "%s" for tag "%s". Do you want to continue? (Y/n)',
-            $draft ? 'draft ' : '',
+            'You are about to create the %s "%s" for tag "%s". Do you want to continue? (Y/n)',
+            $releaseType,
             $name,
             $nextVersion,
         ), true);
@@ -223,7 +245,7 @@ class CreateRelease extends BaseCommand
             return self::ABORTED;
         }
 
-        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft);
+        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier);
 
         $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));
 
@@ -327,6 +349,23 @@ class CreateRelease extends BaseCommand
         $progress->finish('Fetched tags');
 
         return $tags;
+    }
+
+    /**
+     * @param list<ReleaseTag> $tags
+     */
+    private function nextPrereleaseVersion(Version $version, string $identifier, array $tags): Version
+    {
+        $number = 0;
+        foreach ($tags as $tag) {
+            if (Version::EQUAL !== $tag->version->compareTo($version)) {
+                continue;
+            }
+
+            $number = max($number, $tag->version->prereleaseNumber($identifier) ?? 0);
+        }
+
+        return $version->withPrerelease($identifier, $number + 1);
     }
 
     /**
