@@ -72,6 +72,7 @@ Run `composer run ci` after making changes.
 
 - Do not edit `vendor/` or generated coverage output under `build/`.
 - Avoid committing local environment files (`.env`, `.imbo-releaser.php`, local tool cache files).
+- Never create commits while on the `main` branch. Create or switch to a feature branch first.
 - Keep CLI UX and options backward-compatible unless the task explicitly requires breaking changes.
 - If you see unrelated local changes in the working tree, do not revert them.
 
