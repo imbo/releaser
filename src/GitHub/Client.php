@@ -5,8 +5,8 @@ namespace ImboReleaser\GitHub;
 use DateMalformedStringException;
 use DateTimeImmutable;
 use GuzzleHttp\Client as GuzzleHttpClient;
-use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ResponseException;
+use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Header;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
@@ -119,7 +119,7 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($e)), previous: $e);
         }
 
@@ -167,7 +167,7 @@ final class Client
                     // 'make_latest' => 'Can be one of: true, false, legacy',
                 ],
             ]);
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
@@ -188,7 +188,7 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/releases/tags/%s', $repository, $version));
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
@@ -200,7 +200,7 @@ final class Client
 
         try {
             $this->httpClient->delete(sprintf('/repos/%s/releases/%d', $repository, $releaseId));
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
     }
@@ -214,7 +214,7 @@ final class Client
     {
         try {
             $this->httpClient->delete(sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
     }
@@ -242,7 +242,7 @@ final class Client
                     // 'tagger' => ['name' => '...', 'email' => '...'],
                 ],
             ]);
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to create tag object for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
@@ -259,7 +259,7 @@ final class Client
                     'sha' => $tagData['sha'],
                 ],
             ]);
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to create tag reference for version "%s" and sha "%s", got: "%s"', $version, $tagData['sha'], $this->responseStatus($e)), previous: $e);
         }
     }
@@ -275,7 +275,7 @@ final class Client
     {
         try {
             $response = $this->httpClient->get(sprintf('/repos/%s/branches/%s', $repository, $branch->name));
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
         }
 
@@ -336,7 +336,7 @@ final class Client
     {
         try {
             $response = $this->httpClient->get($url);
-        } catch (RequestException $e) {
+        } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request data from the GitHub API, got: "%s"', $this->responseStatus($e)), previous: $e);
         }
 
@@ -384,7 +384,7 @@ final class Client
         return $data;
     }
 
-    private function responseStatus(RequestException $exception): string
+    private function responseStatus(TransferException $exception): string
     {
         if (!$exception instanceof ResponseException) {
             return 'no response';

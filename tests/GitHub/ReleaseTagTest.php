@@ -16,6 +16,7 @@ class ReleaseTagTest extends TestCase
         $this->assertSame('v1.2.3', $releaseTag->name);
         $this->assertSame('abc123', $releaseTag->sha);
         $this->assertSame('v1.2.3', (string) $releaseTag->version);
+        $this->assertSame('v1.2.3', (string) $releaseTag);
     }
 
     public function testRejectsTagWithoutVersion(): void

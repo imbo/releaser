@@ -46,6 +46,15 @@ class ReleaseTest extends TestCase
             ],
             'error' => 'Missing required "created_at" key',
         ];
+        yield 'invalid created_at' => [
+            'data' => [
+                'name' => 'release name',
+                'tag_name' => 'v1.0.0',
+                'html_url' => '<release-url>',
+                'created_at' => 'not-a-date',
+            ],
+            'error' => 'Invalid "created_at" value: not-a-date',
+        ];
     }
 
     /**
