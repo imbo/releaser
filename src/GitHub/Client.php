@@ -149,7 +149,7 @@ final class Client
      *
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#create-a-release
      */
-    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes, ?string $name = null, bool $draft = false): Release
+    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes, ?string $name = null, bool $draft = false, bool $prerelease = false): Release
     {
         $this->createAnnotatedTag($repository, $branch, $version, $releaseNotes);
 
@@ -161,8 +161,8 @@ final class Client
                     'body' => $releaseNotes,
                     'generate_release_notes' => false,
                     'draft' => $draft,
+                    'prerelease' => $prerelease,
 
-                    // 'prerelease' => <bool>,
                     // 'discussion_category_name' => '...',
                     // 'make_latest' => 'Can be one of: true, false, legacy',
                 ],

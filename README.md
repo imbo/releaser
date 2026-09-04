@@ -58,7 +58,40 @@ imbo-releaser create --no-interaction --no-edit --repository owner/repo --branch
 imbo-releaser create --help
 ```
 
-This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created. Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
+This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created. Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft. Pass `--prerelease <identifier>` to create a prerelease, for example `--prerelease rc` creates `v1.2.3-rc.1`. Repeating the command with the same identifier increments the prerelease number, such as `v1.2.3-rc.2`. Run the command without `--prerelease` to create the stable release; prerelease tags do not affect stable version calculation.
+
+### Example release workflow
+
+Imbo Releaser calculates the next version from the titles of merged pull requests. Use a [Conventional Commit](https://www.conventionalcommits.org/) title when creating a pull request:
+
+```bash
+git switch -c feat/add-export
+git commit -am "feat: add export command"
+git push --set-upstream origin feat/add-export
+gh pr create --title "feat: add export command" --base main
+gh pr merge --merge --delete-branch
+```
+
+After the pull request is merged, create a release candidate. With a latest stable tag of `v1.2.3`, the feature pull request makes the next version `v1.3.0`:
+
+```bash
+imbo-releaser create --repository owner/repo --branch main --prerelease rc --name "Version 1.3 release candidate"
+# Creates the v1.3.0-rc.1 tag and GitHub prerelease
+```
+
+Run the same command after further changes to create the next candidate:
+
+```bash
+imbo-releaser create --repository owner/repo --branch main --prerelease rc --name "Version 1.3 release candidate"
+# Creates the v1.3.0-rc.2 tag and GitHub prerelease
+```
+
+When the candidate is ready to publish, omit `--prerelease` to create the stable release:
+
+```bash
+imbo-releaser create --repository owner/repo --branch main --name "Version 1.3"
+# Creates the v1.3.0 tag and GitHub release
+```
 
 ### List existing releases
 

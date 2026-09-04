@@ -18,7 +18,7 @@ class ReleaseTagTest extends TestCase
         $this->assertSame('v1.2.3', (string) $releaseTag->version);
     }
 
-    public function testIgnoresTagWithoutVersion(): void
+    public function testRejectsTagWithoutVersion(): void
     {
         $this->expectException(InvalidArgumentException::class);
         ReleaseTag::fromTag(new Tag('nightly', 'abc123'));

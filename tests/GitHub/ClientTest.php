@@ -305,7 +305,7 @@ class ClientTest extends TestCase
             ])),
         );
 
-        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0', true);
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0', true, true);
 
         $this->assertCount(4, $history);
         $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
@@ -340,6 +340,28 @@ class ClientTest extends TestCase
         $this->assertSame('Release 1.0', $releasePayload['name']);
         $this->assertSame('1.0.0', $releasePayload['tag_name']);
         $this->assertTrue($releasePayload['draft']);
+        $this->assertTrue($releasePayload['prerelease']);
+    }
+
+    public function testCreateReleaseIsNotPrereleaseByDefault(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+            new Response(201, [], $this->json([
+                'name' => 'release name',
+                'tag_name' => '1.0.0',
+                'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0',
+                'created_at' => '2024-01-01T00:00:00Z',
+            ])),
+        );
+
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
+
+        /** @var array<string,mixed> $releasePayload */
+        $releasePayload = json_decode($history[3]['request']->getBody()->getContents(), true);
+        $this->assertFalse($releasePayload['prerelease']);
     }
 
     public function testGetMergedPullRequestsSkipsDrafts(): void
