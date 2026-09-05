@@ -195,6 +195,30 @@ The next version is determined automatically based on the Conventional Commit ty
 
 If no tags exist yet, the configured `initialVersion()` is used (default `v0.1.0`).
 
+## Maintainer release procedure
+
+If dependency updates are intended for the release, update them deliberately and review the lockfile changes before committing them:
+
+```bash
+composer update
+git diff -- composer.json composer.lock
+```
+
+Before creating a release of Imbo Releaser, verify the release commit with:
+
+```bash
+composer validate --strict
+composer audit
+composer run ci
+```
+
+Install the candidate in a clean Composer project using both supported installation modes, then verify that `imbo-releaser --help`, `imbo-releaser --version`, and an authenticated API command work:
+
+```bash
+composer global require imbo/releaser:<version>
+composer require --dev imbo/releaser:<version>
+```
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
