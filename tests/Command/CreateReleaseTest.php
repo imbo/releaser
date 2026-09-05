@@ -341,6 +341,30 @@ class CreateReleaseTest extends TestCase
         $this->assertCount(7, $history);
     }
 
+    public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
+            new Response(201), // tag reference creation
+            new Response(422), // release creation
+        );
+        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to create the GitHub release, but the tag "v0.1.0" was created. Delete the tag before retrying: imbo-releaser delete --tag-only v0.1.0');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+    }
+
     public function testUserDeclinesConfirmation(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
