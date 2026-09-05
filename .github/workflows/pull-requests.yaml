@@ -11,7 +11,7 @@ jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: composer install --no-dev
       - run: scripts/conventional-commit-msg.php "${{ github.event.pull_request.title }}"
   tests-and-qa:
@@ -29,28 +29,38 @@ jobs:
           - test
           - cs
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
       - id: composer-cache-dir
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
       - id: composer-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-php-${{ matrix.php }}-composer-${{ hashFiles('**/composer.lock') }}
       - run: composer validate --strict
       - run: composer install
       - run: composer run ${{ matrix.composer-script }}
+  composer-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+      - run: composer install
+      - run: composer audit
   branch-protection:
     needs:
       - validate-pr-title
       - tests-and-qa
+      - composer-audit
     if: ${{ always() }}
     runs-on: ubuntu-latest
     name: Branch protection
     steps:
-      - if: ${{ needs.validate-pr-title.result != 'success' || needs.tests-and-qa.result != 'success'}}
+      - if: ${{ needs.validate-pr-title.result != 'success' || needs.tests-and-qa.result != 'success' || needs.composer-audit.result != 'success'}}
         run: exit 1
       - run: echo "All checks passed."
