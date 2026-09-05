@@ -5,6 +5,7 @@ namespace ImboReleaser\Command;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Config;
 use ImboReleaser\Config\Resolver;
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\TestHttpClientTrait;
@@ -87,6 +88,19 @@ class DeleteReleaseTest extends TestCase
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0'], ['interactive' => false]);
     }
 
+    public function testRethrowsTagDeletionFailureWhenDeletingTagOnly(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(500),
+        );
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete tag reference "1.0.0", got: "500 Internal Server Error"');
+        $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => '1.0.0'], ['interactive' => false]);
+    }
+
     public function testUserDeclinesDeleteReleaseConfirmation(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient();
@@ -137,6 +151,22 @@ class DeleteReleaseTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No releases found for repository');
         $commandTester->execute([]);
+    }
+
+    public function testInteractThrowsWhenReleaseSelectionIsInvalid(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([
+                ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
+            ])),
+        );
+        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $commandTester = new CommandTester($command);
+        $commandTester->setInputs(['foo', 'bar', 'baz']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Value "baz" is invalid');
+        $commandTester->execute(['--repository' => 'owner/repo']);
     }
 
     public function testInteractSkipsPromptWhenVersionProvided(): void

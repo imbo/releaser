@@ -10,6 +10,8 @@ use ImboReleaser\GitHub\Client;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 
 #[CoversClass(BaseCommand::class)]
@@ -50,5 +52,18 @@ class BaseCommandTest extends TestCase
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
 
         $this->assertStringContainsString('using default configuration', $commandTester->getDisplay());
+    }
+
+    public function testBuildHelpWithoutCommandSpecificIntroduction(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient();
+        $command = new class(new Client($guzzleClient)) extends BaseCommand {
+            public function execute(InputInterface $input, OutputInterface $output): int
+            {
+                return self::SUCCESS;
+            }
+        };
+
+        $this->assertStringContainsString('<comment>Repository</comment>', $command->getHelp());
     }
 }

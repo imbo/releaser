@@ -2,7 +2,10 @@
 
 namespace ImboReleaser\GitHub;
 
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\TestHttpClientTrait;
 use ImboReleaser\Version;
@@ -202,6 +205,28 @@ class ClientTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Missing required "committer.date" key for commit "abc123"');
+        (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
+    }
+
+    public function testGetShaDateTimeWithInvalidDate(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['committer' => ['date' => 'not-a-date']])),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid "committer.date" value: not-a-date');
+        (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
+    }
+
+    public function testGetShaDateTimeWithConnectionError(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new ConnectException('Connection failed', new Request('GET', 'https://api.github.com')),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to get commit data for "abc123", got: "no response"');
         (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
     }
 

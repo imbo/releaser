@@ -25,6 +25,7 @@ class ProgressIndicatorTest extends TestCase
         $output = new BufferedOutput(decorated: true);
         $progress = new ProgressIndicator($output);
         $progress->start('Fetching releases...');
+        $progress->advance();
         $progress->finish('Fetched releases');
 
         $this->assertStringContainsString('Fetched releases', $output->fetch());
