@@ -5,6 +5,7 @@ namespace ImboReleaser\Command;
 use DateTimeImmutable;
 use ImboReleaser\Console\ProgressIndicator;
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\ReleaseCreationException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
@@ -245,7 +246,11 @@ class CreateRelease extends BaseCommand
             return self::ABORTED;
         }
 
-        $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier);
+        try {
+            $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier);
+        } catch (ReleaseCreationException $e) {
+            throw new RuntimeException(sprintf('Failed to create the GitHub release, but the tag "%s" was created. Delete the tag before retrying: imbo-releaser delete --tag-only %s', $nextVersion, $nextVersion), previous: $e);
+        }
 
         $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));
 

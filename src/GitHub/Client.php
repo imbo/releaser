@@ -9,6 +9,7 @@ use GuzzleHttp\Exception\ResponseException;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Header;
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\ReleaseCreationException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\Version;
 use JsonException;
@@ -168,7 +169,7 @@ final class Client
                 ],
             ]);
         } catch (TransferException $e) {
-            throw new RuntimeException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
+            throw new ReleaseCreationException(sprintf('Failed to create GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
         $data = $this->responseToArray($response);

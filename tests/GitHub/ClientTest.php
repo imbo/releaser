@@ -6,6 +6,7 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\ReleaseCreationException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\TestHttpClientTrait;
 use ImboReleaser\Version;
@@ -311,7 +312,7 @@ class ClientTest extends TestCase
             new Response(422),
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(ReleaseCreationException::class);
         $this->expectExceptionMessage('Failed to create GitHub release for version "1.0.0", got: "422 Unprocessable Entity"');
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
