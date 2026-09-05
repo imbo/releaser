@@ -208,7 +208,6 @@ Before creating a release of Imbo Releaser, verify the release commit with:
 
 ```bash
 composer validate --strict
-composer audit
 composer run ci
 ```
 

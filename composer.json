@@ -57,8 +57,10 @@
     "ci": [
       "@cs",
       "@sa",
-      "@test"
+      "@test",
+      "@security:audit"
     ],
+    "security:audit": "composer audit",
     "cs": "vendor/bin/php-cs-fixer check --diff",
     "cs:fix": "vendor/bin/php-cs-fixer fix --diff",
     "sa": "vendor/bin/phpstan analyse",
