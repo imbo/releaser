@@ -12,6 +12,7 @@ use ImboReleaser\Console\Application;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\GitHub\Middleware\Retry;
+use ImboReleaser\GitHub\Middleware\TokenAuthentication;
 use ImboReleaser\GitHub\TokenResolver;
 use Throwable;
 
@@ -41,21 +42,16 @@ if (null === $autoloader) {
 require $autoloader;
 
 try {
-    $token = (new TokenResolver())->getGitHubToken();
-    if (null === $token) {
-        throw new RuntimeException('Failed to resolve the required GitHub API token. Please make sure to set the "GITHUB_TOKEN" environment variable or authenticate using the GitHub CLI.');
-    }
-
     $retry = new Retry();
     $handlerStack = HandlerStack::create();
     $handlerStack->push(Middleware::retry($retry->decide(...), $retry->delay(...)));
+    $handlerStack->push(Middleware::mapRequest(new TokenAuthentication(new TokenResolver())));
 
     $httpClient = new GuzzleHttpClient([
         'handler' => $handlerStack,
         'base_uri' => 'https://api.github.com',
         'headers' => [
             'Accept' => 'application/vnd.github+json',
-            'Authorization' => sprintf('Bearer %s', $token),
             'X-GitHub-Api-Version' => '2022-11-28',
             'User-Agent' => 'imbo/releaser',
         ],
