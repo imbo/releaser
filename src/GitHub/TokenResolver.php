@@ -7,7 +7,7 @@ use Symfony\Component\Process\Process;
 
 use function is_string;
 
-final class TokenResolver
+class TokenResolver
 {
     private readonly ?string $cwd;
 
