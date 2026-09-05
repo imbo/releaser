@@ -4,7 +4,7 @@ If you want to contribute to Imbo Releaser please follow these guidelines.
 
 ## Requirements for local development
 
-You should ideally use PHP 8.3 since that is the lowest supported version. Features added to PHP 8.4 and later MUST NOT be used as long as we want to support 8.3.
+PHP 8.3 is the minimum supported version. Use it when verifying compatibility with the minimum platform; features added in PHP 8.4 and later MUST NOT be used while PHP 8.3 remains supported.
 
 The GitHub workflow will run tests / QA against PHP 8.3, 8.4 and 8.5.
 
@@ -25,6 +25,14 @@ Run the following command to install dependencies using [Composer](https://getco
 [PHPStan](https://phpstan.org) is used for static code analysis. Run the analysis using a Composer script:
 
     composer run sa
+
+Run the Composer dependency security audit with:
+
+    composer run security:audit
+
+Run all code quality checks and tests with:
+
+    composer run ci
 
 ## Coding standards
 
