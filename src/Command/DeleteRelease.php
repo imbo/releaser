@@ -43,6 +43,11 @@ class DeleteRelease extends BaseCommand
                 'tag-only', null,
                 InputOption::VALUE_NONE,
                 'Delete only the Git tag associated with the version.',
+            )
+            ->addOption(
+                'dry-run', 'd',
+                InputOption::VALUE_NONE,
+                'Show what would be deleted without deleting it.',
             );
     }
 
@@ -61,6 +66,10 @@ class DeleteRelease extends BaseCommand
               Use <info>--tag-only</info> to delete only the Git tag. This is useful for recovering
               from an incomplete release deletion. The <info>version</info> argument is required
               when using this option.
+
+            <comment>Dry run</comment>
+              Pass <info>-d|--dry-run</info> to preview what would be deleted without deleting a GitHub
+              release or Git tag. The <info>version</info> argument is required when using this option.
             HELP,
             ListReleases::NAME,
         );
@@ -75,7 +84,7 @@ class DeleteRelease extends BaseCommand
     {
         parent::interact($input, $output);
 
-        if (null !== $input->getArgument('version') || $input->getOption('tag-only')) {
+        if (null !== $input->getArgument('version') || $input->getOption('tag-only') || $input->getOption('dry-run')) {
             return;
         }
 
@@ -144,6 +153,17 @@ class DeleteRelease extends BaseCommand
 
         /** @var bool */
         $tagOnly = $input->getOption('tag-only');
+        /** @var bool */
+        $dryRun = $input->getOption('dry-run');
+        if ($dryRun) {
+            $output->writeln($tagOnly
+                ? sprintf('Would delete Git tag "%s" from repository "%s".', $version, $repository)
+                : sprintf('Would delete release "%s" and its associated Git tag from repository "%s".', $version, $repository),
+            );
+
+            return self::SUCCESS;
+        }
+
         $question = new ConfirmationQuestion(
             $tagOnly
                 ? sprintf('You are about to delete Git tag "%s". Do you want to continue? (y/N)', $version)

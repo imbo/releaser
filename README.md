@@ -58,7 +58,13 @@ imbo-releaser create --no-interaction --no-edit --repository owner/repo --branch
 imbo-releaser create --help
 ```
 
-This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created. Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft. Pass `--prerelease <identifier>` to create a prerelease, for example `--prerelease rc` creates `v1.2.3-rc.1`. Repeating the command with the same identifier increments the prerelease number, such as `v1.2.3-rc.2`. Run the command without `--prerelease` to create the stable release; prerelease tags do not affect stable version calculation.
+This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created.
+
+Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
+
+Pass `--prerelease <identifier>` to create a prerelease, for example `--prerelease rc` creates `v1.2.3-rc.1`. Repeating the command with the same identifier increments the prerelease number, such as `v1.2.3-rc.2`. Run the command without `--prerelease` to create the stable release; prerelease tags do not affect stable version calculation.
+
+Pass `--dry-run` to preview the calculated release and release notes without creating a tag or release.
 
 ### Example release workflow
 
@@ -108,6 +114,8 @@ imbo-releaser delete --help
 ```
 
 This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
+
+Pass `-d` or `--dry-run` with a version to preview the deletion without deleting the GitHub release or tag.
 
 Deleting a release and its tag is not atomic. If the release is deleted but the tag deletion fails, delete the remaining tag with:
 

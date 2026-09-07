@@ -2,9 +2,11 @@
 
 namespace ImboReleaser\Command;
 
+use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Config;
 use ImboReleaser\Config\Resolver;
+use ImboReleaser\ConfigInterface;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
@@ -21,7 +23,7 @@ class DeleteReleaseTest extends TestCase
     public function testInvalidVersionArgument(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Invalid version "not-a-version"');
@@ -31,7 +33,7 @@ class DeleteReleaseTest extends TestCase
     public function testNonInteractiveModeRequiresVersionArgument(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Specify the version to delete when running non-interactively or using --tag-only.');
@@ -45,7 +47,7 @@ class DeleteReleaseTest extends TestCase
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0'], ['interactive' => false]);
 
@@ -64,7 +66,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(204),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => '1.0.0'], ['interactive' => false]);
 
@@ -74,6 +76,30 @@ class DeleteReleaseTest extends TestCase
         $this->assertSame('/repos/owner/repo/git/refs/tags/1.0.0', (string) $history[0]['request']->getUri());
     }
 
+    public function testDryRunDoesNotDeleteReleaseOrTag(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient();
+        $command = $this->createCommand($guzzleClient);
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['--repository' => 'owner/repo', '-d' => true, 'version' => '1.0.0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Would delete release "1.0.0" and its associated Git tag from repository "owner/repo".', $commandTester->getDisplay());
+        $this->assertCount(0, $history);
+    }
+
+    public function testDryRunDoesNotDeleteTag(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient();
+        $command = $this->createCommand($guzzleClient);
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, '--dry-run' => true, 'version' => '1.0.0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Would delete Git tag "1.0.0" from repository "owner/repo".', $commandTester->getDisplay());
+        $this->assertCount(0, $history);
+    }
+
     public function testReportsRecoveryCommandWhenTagDeletionFails(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
@@ -81,7 +107,7 @@ class DeleteReleaseTest extends TestCase
             new Response(204),
             new Response(500),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only 1.0.0');
@@ -93,7 +119,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(500),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
@@ -104,7 +130,7 @@ class DeleteReleaseTest extends TestCase
     public function testUserDeclinesDeleteReleaseConfirmation(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient();
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['no']);
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0']);
@@ -124,7 +150,7 @@ class DeleteReleaseTest extends TestCase
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', '2.0.0', 'y']);
         $commandTester->execute([]);
@@ -145,7 +171,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([])),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo']);
         $this->expectException(RuntimeException::class);
@@ -160,7 +186,7 @@ class DeleteReleaseTest extends TestCase
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
             ])),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['foo', 'bar', 'baz']);
 
@@ -176,7 +202,7 @@ class DeleteReleaseTest extends TestCase
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', 'y']);
         $commandTester->execute(['version' => '3.0.0']);
@@ -202,11 +228,19 @@ class DeleteReleaseTest extends TestCase
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
             ])),
         );
-        $command = new DeleteRelease(new Client($guzzleClient), new Resolver($config, __DIR__));
+        $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo']);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No releases found for repository');
         $commandTester->execute([]);
+    }
+
+    private function createCommand(GuzzleClient $guzzleClient, ?ConfigInterface $config = null): DeleteRelease
+    {
+        return new DeleteRelease(
+            new Client($guzzleClient),
+            new Resolver($config ?? new Config(), __DIR__),
+        );
     }
 }
