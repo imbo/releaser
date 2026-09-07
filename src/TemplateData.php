@@ -16,13 +16,14 @@ class TemplateData
         private readonly array $groupedPullRequests,
         /** @var array<string,PullRequest> */
         private readonly array $newContributors,
+        private readonly ?string $releaserVersion,
     ) {
     }
 
     /**
      * Return the template context as an associative array.
      *
-     * @return array{nextVersion:Version,repository:Repository,pullRequests:list<PullRequest>,groupedPullRequests:array<string,list<PullRequest>>,newContributors:array<string,PullRequest>}
+     * @return array{nextVersion:Version,repository:Repository,pullRequests:list<PullRequest>,groupedPullRequests:array<string,list<PullRequest>>,newContributors:array<string,PullRequest>,releaserVersion:?string}
      */
     public function toContext(): array
     {
@@ -32,6 +33,7 @@ class TemplateData
             'pullRequests' => $this->pullRequests,
             'groupedPullRequests' => $this->groupedPullRequests,
             'newContributors' => $this->newContributors,
+            'releaserVersion' => $this->releaserVersion,
         ];
     }
 }

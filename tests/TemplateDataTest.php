@@ -21,8 +21,9 @@ class TemplateDataTest extends TestCase
         $pullRequests = [$pr1, $pr2];
         $groupedPullRequests = ['New Features 🚀' => [$pr1], 'Bug Fixes 🐛' => [$pr2]];
         $newContributors = ['alice' => $pr1];
+        $releaserVersion = 'v0.1.0';
 
-        $data = new TemplateData($nextVersion, $repository, $pullRequests, $groupedPullRequests, $newContributors);
+        $data = new TemplateData($nextVersion, $repository, $pullRequests, $groupedPullRequests, $newContributors, $releaserVersion);
         $context = $data->toContext();
 
         $this->assertSame($nextVersion, $context['nextVersion']);
@@ -30,5 +31,20 @@ class TemplateDataTest extends TestCase
         $this->assertSame($pullRequests, $context['pullRequests']);
         $this->assertSame($groupedPullRequests, $context['groupedPullRequests']);
         $this->assertSame($newContributors, $context['newContributors']);
+        $this->assertSame($releaserVersion, $context['releaserVersion']);
+    }
+
+    public function testToContextWithoutReleaserVersion(): void
+    {
+        $data = new TemplateData(
+            Version::fromString('1.2.3'),
+            Repository::fromString('owner/repo'),
+            [],
+            [],
+            [],
+            null,
+        );
+
+        $this->assertNull($data->toContext()['releaserVersion']);
     }
 }

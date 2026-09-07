@@ -227,6 +227,7 @@ class CreateRelease extends BaseCommand
             $pullRequestsInRelease,
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),
             $this->getNewContributors($pullRequests, $since),
+            $this->getApplication()?->getVersion(),
         ));
 
         if ($input->isInteractive() && !$input->getOption('no-edit')) {
