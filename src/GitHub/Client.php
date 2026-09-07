@@ -4,7 +4,7 @@ namespace ImboReleaser\GitHub;
 
 use DateMalformedStringException;
 use DateTimeImmutable;
-use GuzzleHttp\Client as GuzzleHttpClient;
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ResponseException;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Psr7\Header;
@@ -29,9 +29,9 @@ use const JSON_THROW_ON_ERROR;
 final class Client
 {
     /**
-     * @param GuzzleHttpClient $httpClient an instance of the Guzzle HTTP client to use for making API requests
+     * @param ClientInterface $httpClient an HTTP client to use for making API requests
      */
-    public function __construct(private GuzzleHttpClient $httpClient)
+    public function __construct(private ClientInterface $httpClient)
     {
     }
 
@@ -119,7 +119,7 @@ final class Client
     public function getShaDateTime(Repository $repository, string $sha): DateTimeImmutable
     {
         try {
-            $response = $this->httpClient->get(sprintf('/repos/%s/git/commits/%s', $repository, $sha));
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/git/commits/%s', $repository, $sha));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($e)), previous: $e);
         }
@@ -155,7 +155,7 @@ final class Client
         $this->createAnnotatedTag($repository, $branch, $version, $releaseNotes);
 
         try {
-            $response = $this->httpClient->post(sprintf('/repos/%s/releases', $repository), [
+            $response = $this->httpClient->request('POST', sprintf('/repos/%s/releases', $repository), [
                 'json' => [
                     'tag_name' => (string) $version,
                     'name' => $name ?? (string) $version,
@@ -188,7 +188,7 @@ final class Client
     public function deleteRelease(Repository $repository, Version $version): void
     {
         try {
-            $response = $this->httpClient->get(sprintf('/repos/%s/releases/tags/%s', $repository, $version));
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/releases/tags/%s', $repository, $version));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
@@ -200,7 +200,7 @@ final class Client
         }
 
         try {
-            $this->httpClient->delete(sprintf('/repos/%s/releases/%d', $repository, $releaseId));
+            $this->httpClient->request('DELETE', sprintf('/repos/%s/releases/%d', $repository, $releaseId));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
@@ -214,7 +214,7 @@ final class Client
     public function deleteTag(Repository $repository, Version $version): void
     {
         try {
-            $this->httpClient->delete(sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
+            $this->httpClient->request('DELETE', sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
@@ -233,7 +233,7 @@ final class Client
         $branchSha = $this->getBranchSha($repository, $branch);
 
         try {
-            $response = $this->httpClient->post(sprintf('/repos/%s/git/tags', $repository), [
+            $response = $this->httpClient->request('POST', sprintf('/repos/%s/git/tags', $repository), [
                 'json' => [
                     'tag' => (string) $version,
                     'message' => $releaseNotes,
@@ -254,7 +254,7 @@ final class Client
         }
 
         try {
-            $this->httpClient->post(sprintf('/repos/%s/git/refs', $repository), [
+            $this->httpClient->request('POST', sprintf('/repos/%s/git/refs', $repository), [
                 'json' => [
                     'ref' => sprintf('refs/tags/%s', $version),
                     'sha' => $tagData['sha'],
@@ -275,7 +275,7 @@ final class Client
     private function getBranchSha(Repository $repository, Branch $branch): string
     {
         try {
-            $response = $this->httpClient->get(sprintf('/repos/%s/branches/%s', $repository, $branch->name));
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, $branch->name));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
         }
@@ -336,7 +336,7 @@ final class Client
     private function getJsonAsArray(string $url): array
     {
         try {
-            $response = $this->httpClient->get($url);
+            $response = $this->httpClient->request('GET', $url);
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request data from the GitHub API, got: "%s"', $this->responseStatus($e)), previous: $e);
         }

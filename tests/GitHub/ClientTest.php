@@ -2,6 +2,7 @@
 
 namespace ImboReleaser\GitHub;
 
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -19,6 +20,20 @@ use const DATE_RFC2822;
 class ClientTest extends TestCase
 {
     use TestHttpClientTrait;
+
+    public function testAcceptsClientInterface(): void
+    {
+        $httpClient = $this->createMock(ClientInterface::class);
+        $httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with('GET', '/repos/owner/repo/tags?per_page=100')
+            ->willReturn(new Response(200, [], $this->json([])));
+
+        $tags = iterator_to_array((new Client($httpClient))->getTags(Repository::fromString('owner/repo')));
+
+        $this->assertSame([], $tags);
+    }
 
     public function testGetBranches(): void
     {
