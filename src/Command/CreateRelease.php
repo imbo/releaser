@@ -72,6 +72,11 @@ class CreateRelease extends BaseCommand
                 'Create a prerelease using the given identifier, such as "rc" or "beta".',
             )
             ->addOption(
+                'dry-run', 'd',
+                InputOption::VALUE_NONE,
+                'Show the release that would be created without creating it.',
+            )
+            ->addOption(
                 'no-edit', null,
                 InputOption::VALUE_NONE,
                 'Don\'t edit automatically generated release notes.',
@@ -105,6 +110,10 @@ class CreateRelease extends BaseCommand
         <comment>Prerelease</comment>
           The <info>--prerelease</info> option creates a prerelease with the given identifier.
           For example, <info>--prerelease rc</info> creates tags such as <info>v1.2.3-rc.1</info>.
+
+        <comment>Dry run</comment>
+          Pass <info>--dry-run</info> to preview the calculated release and release notes without
+          creating a Git tag or GitHub release.
 
         <comment>Editing</comment>
           When running interactively, the rendered release notes are opened in an
@@ -226,6 +235,7 @@ class CreateRelease extends BaseCommand
 
         /** @var ?string */
         $name = $input->getOption('name') ?? (string) $nextVersion;
+
         /** @var bool */
         $draft = $input->getOption('draft');
         $releaseType = match (true) {
@@ -234,11 +244,23 @@ class CreateRelease extends BaseCommand
             null !== $prereleaseIdentifier => 'prerelease',
             default => 'release',
         };
+
+        /** @var bool */
+        $dryRun = $input->getOption('dry-run');
+        if ($dryRun) {
+            $output->writeln(sprintf('Would create %s "%s" with tag "%s" in "%s".', $releaseType, $name, $nextVersion, $repository));
+            $output->writeln('Release notes:');
+            $output->writeln($releaseNotes);
+
+            return self::SUCCESS;
+        }
+
         $question = new ConfirmationQuestion(sprintf(
-            'You are about to create the %s "%s" for tag "%s". Do you want to continue? (Y/n)',
+            'You are about to create the %s "%s" for tag "%s" in repository "%s". Do you want to continue? (Y/n)',
             $releaseType,
             $name,
             $nextVersion,
+            $repository,
         ), true);
         if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
             $output->writeln('Aborting.');

@@ -2,9 +2,11 @@
 
 namespace ImboReleaser\Command;
 
+use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Config;
 use ImboReleaser\Config\Resolver;
+use ImboReleaser\ConfigInterface;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
@@ -25,7 +27,7 @@ class CreateReleaseTest extends TestCase
     public function testMissingBranch(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
-        $command = new CreateRelease(new Client($guzzleClient));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Specify a branch');
@@ -40,7 +42,7 @@ class CreateReleaseTest extends TestCase
                 ['name' => 'v1.x'],
             ])),
         );
-        $command = new CreateRelease(new Client($guzzleClient));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['foo', 'bar', 'baz']); // 3 attempts
         $this->expectException(InvalidArgumentException::class);
@@ -55,7 +57,7 @@ class CreateReleaseTest extends TestCase
                 ['name' => 'develop'],
             ])),
         );
-        $command = new CreateRelease(new Client($guzzleClient));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No valid branches found in the repository');
@@ -91,12 +93,12 @@ class CreateReleaseTest extends TestCase
                 'created_at' => '2024-01-01T00:00:00Z',
             ])), // release creation
         );
-        $command = new CreateRelease(new Client($guzzleClient));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['yes']); // release confirmation
         $commandTester->execute(['--repository' => 'owner/repo', '--no-edit' => true, '--name' => 'Release 0.1', '--draft' => true, '--prerelease' => 'rc']);
         $this->assertStringContainsString('Only one branch available (main)', $commandTester->getDisplay());
-        $this->assertStringContainsString('You are about to create the draft prerelease "Release 0.1" for tag "v0.1.0-rc.2".', $commandTester->getDisplay());
+        $this->assertStringContainsString('You are about to create the draft prerelease "Release 0.1" for tag "v0.1.0-rc.2" in repository "owner/repo".', $commandTester->getDisplay());
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertCount(7, $history);
 
@@ -195,7 +197,7 @@ class CreateReleaseTest extends TestCase
                 'created_at' => '2024-01-01T00:00:00Z',
             ])), // release creation
         );
-        $command = new CreateRelease(new Client($guzzleClient));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo', 'main']);
         $commandTester->execute(['--no-edit' => true]);
@@ -214,7 +216,7 @@ class CreateReleaseTest extends TestCase
             ])), // commits
             new Response(200, [], $this->json([])), // pull requests
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No pull requests found, aborting release.');
@@ -238,7 +240,7 @@ class CreateReleaseTest extends TestCase
                 'base' => ['ref' => 'main'],
             ]])),
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver($config, __DIR__));
+        $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
@@ -263,7 +265,7 @@ class CreateReleaseTest extends TestCase
                 'committer' => ['date' => '2024-01-02T00:00:00Z'],
             ])), // commit date for tag (after the PR merged_at)
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No pull requests found for the release.');
@@ -290,7 +292,7 @@ class CreateReleaseTest extends TestCase
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagSha']],
             ])), // tags
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver($config, __DIR__));
+        $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['no']);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
@@ -331,7 +333,7 @@ class CreateReleaseTest extends TestCase
                 'created_at' => '2024-02-02T00:00:00Z',
             ])), // release creation
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['yes']);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
@@ -339,6 +341,33 @@ class CreateReleaseTest extends TestCase
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertStringContainsString('Release created', $commandTester->getDisplay());
         $this->assertCount(7, $history);
+    }
+
+    public function testDryRunDoesNotCreateRelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+        );
+        $command = $this->createCommand($guzzleClient);
+        $commandTester = new CommandTester($command);
+        $commandTester->execute([
+            '--repository' => 'owner/repo',
+            '--branch' => 'main',
+            '-d' => true,
+            '--name' => 'Release 0.1',
+        ], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('Would create release "Release 0.1" with tag "v0.1.0" in "owner/repo".', $commandTester->getDisplay());
+        $this->assertStringContainsString('Release notes:', $commandTester->getDisplay());
+        $this->assertCount(2, $history);
     }
 
     public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
@@ -357,7 +386,7 @@ class CreateReleaseTest extends TestCase
             new Response(201), // tag reference creation
             new Response(422), // release creation
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
@@ -377,7 +406,7 @@ class CreateReleaseTest extends TestCase
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['no']);
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
@@ -399,7 +428,7 @@ class CreateReleaseTest extends TestCase
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The specified template file "invalid-template" does not exist or is not readable.');
@@ -418,12 +447,20 @@ class CreateReleaseTest extends TestCase
             ]])),
             new Response(200, [], $this->json([])),
         );
-        $command = new CreateRelease(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $template = __DIR__.'/../fixtures/invalid-template.twig';
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(sprintf('Failed to render release notes template "%s"', $template));
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--template' => $template]);
+    }
+
+    private function createCommand(GuzzleClient $guzzleClient, ?ConfigInterface $config = null): CreateRelease
+    {
+        return new CreateRelease(
+            new Client($guzzleClient),
+            new Resolver($config ?? new Config(), __DIR__),
+        );
     }
 }
