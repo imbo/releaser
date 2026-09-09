@@ -192,7 +192,8 @@ class CreateRelease extends BaseCommand
             throw new RuntimeException('No pull requests found, aborting release. Either add pull requests, or override the filterPullRequest method in your config.');
         }
 
-        $tags = $this->getTags($repository, $output);
+        $allTags = $this->getTags($repository, $output);
+        $tags = array_values(array_filter($allTags, $this->config->filterTag(...)));
         $tag = $this->config->getLatestTagForBranch($branch, $tags);
         $since = null;
         if (null === $tag) {
@@ -214,7 +215,13 @@ class CreateRelease extends BaseCommand
         /** @var ?string */
         $prereleaseIdentifier = $input->getOption('prerelease');
         if (null !== $prereleaseIdentifier) {
-            $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $tags);
+            $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $allTags);
+        }
+
+        foreach ($allTags as $tag) {
+            if ($tag->name === (string) $nextVersion) {
+                throw new RuntimeException(sprintf('Tag "%s" already exists in repository "%s".', $nextVersion, $repository));
+            }
         }
 
         if ([] === $pullRequestsInRelease) {
@@ -364,10 +371,6 @@ class CreateRelease extends BaseCommand
             try {
                 $releaseTag = ReleaseTag::fromTag($tag);
             } catch (InvalidArgumentException) {
-                continue;
-            }
-
-            if (!$this->config->filterTag($releaseTag)) {
                 continue;
             }
 
