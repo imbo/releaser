@@ -6,7 +6,6 @@ use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
-use ImboReleaser\GitHub\Release;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\User;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -65,27 +64,6 @@ class ConfigTest extends TestCase
     public function testFilterBranch(string $branchName, bool $valid): void
     {
         $this->assertSame($valid, (new Config())->filterBranch(new Branch($branchName)));
-    }
-
-    /**
-     * @return iterable<string,array{release:Release,valid:bool}>
-     */
-    public static function filterReleaseProvider(): iterable
-    {
-        yield 'no version' => [
-            'release' => new Release('name', 'some-tag-name', 'url', new DateTimeImmutable()),
-            'valid' => false,
-        ];
-        yield 'valid version' => [
-            'release' => new Release('name', 'v1.2.3', 'url', new DateTimeImmutable()),
-            'valid' => true,
-        ];
-    }
-
-    #[DataProvider('filterReleaseProvider')]
-    public function testFilterRelease(Release $release, bool $valid): void
-    {
-        $this->assertSame($valid, (new Config())->filterRelease($release));
     }
 
     public function testFilterTag(): void

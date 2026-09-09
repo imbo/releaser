@@ -73,28 +73,21 @@ class ListReleasesTest extends TestCase
         $this->assertStringContainsString('Release 1.0.0', $commandTester->getDisplay());
     }
 
-    public function testFilterRelease(): void
+    public function testSkipsUnversionedReleases(): void
     {
-        $config = new class extends Config {
-            public function filterRelease(\ImboReleaser\GitHub\Release $release): bool
-            {
-                return '1.0.0' !== $release->tagName;
-            }
-        };
-
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
-                ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
+                ['name' => 'Nightly release', 'tag_name' => 'nightly', 'html_url' => 'https://github.com/owner/repo/releases/tag/nightly', 'created_at' => '2026-01-01T00:00:00Z'],
                 ['name' => 'Release 2.0.0', 'tag_name' => '2.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/2.0.0', 'created_at' => '2026-01-02T00:00:00Z'],
             ])),
         );
-        $command = new ListReleases(new Client($guzzleClient), new Resolver($config, __DIR__));
+        $command = new ListReleases(new Client($guzzleClient), new Resolver(new Config(), __DIR__));
         $commandTester = new CommandTester($command);
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
 
         $this->assertSame(ListReleases::SUCCESS, $commandTester->getStatusCode());
         $display = $commandTester->getDisplay();
-        $this->assertStringNotContainsString('Release 1.0.0', $display);
+        $this->assertStringNotContainsString('Nightly release', $display);
         $this->assertStringContainsString('Release 2.0.0', $display);
     }
 }

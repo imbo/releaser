@@ -214,21 +214,14 @@ class DeleteReleaseTest extends TestCase
         $this->assertSame('/repos/owner/repo/git/refs/tags/3.0.0', (string) $history[2]['request']->getUri());
     }
 
-    public function testFilterRelease(): void
+    public function testInteractSkipsUnversionedReleases(): void
     {
-        $config = new class extends Config {
-            public function filterRelease(\ImboReleaser\GitHub\Release $release): bool
-            {
-                return '1.0.0' !== $release->tagName;
-            }
-        };
-
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
-                ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
+                ['name' => 'Nightly release', 'tag_name' => 'nightly', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
             ])),
         );
-        $command = $this->createCommand($guzzleClient, $config);
+        $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo']);
         $this->expectException(RuntimeException::class);

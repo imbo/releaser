@@ -105,7 +105,7 @@ class DeleteRelease extends BaseCommand
         $releases = [];
         foreach ($this->gitHubClient->getReleases($repository) as $release) {
             $progress->advance();
-            if (!$this->config->filterRelease($release)) {
+            if (null === $release->version) {
                 continue;
             }
 
