@@ -10,7 +10,7 @@ use ImboReleaser\ConfigInterface;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
-use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -226,7 +226,7 @@ class CreateReleaseTest extends TestCase
     public function testFilterPullRequest(): void
     {
         $config = new class extends Config {
-            public function filterPullRequest(PullRequest $pullRequest): bool
+            public function filterPullRequest(ReleasePullRequest $pullRequest): bool
             {
                 return false;
             }
@@ -236,6 +236,31 @@ class CreateReleaseTest extends TestCase
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])),
+        );
+        $command = $this->createCommand($guzzleClient, $config);
+        $commandTester = new CommandTester($command);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No pull requests found, aborting release.');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+    }
+
+    public function testSkipsNonConventionalPullRequestsBeforeFiltering(): void
+    {
+        $config = new class extends Config {
+            public function filterPullRequest(ReleasePullRequest $pullRequest): bool
+            {
+                return true;
+            }
+        };
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'New feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
             ]])),

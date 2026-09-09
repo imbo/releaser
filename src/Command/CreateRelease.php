@@ -8,7 +8,7 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\ReleaseCreationException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
-use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\TemplateData;
@@ -286,9 +286,9 @@ class CreateRelease extends BaseCommand
      * The pull requests are ordered by merged date in descending order, so if a contributor has
      * multiple pull requests, only the first one will be included in the list of new contributors.
      *
-     * @param list<PullRequest> $pullRequests
+     * @param list<ReleasePullRequest> $pullRequests
      *
-     * @return array<string,PullRequest> an associative array where the keys are the GitHub usernames of the new contributors and the values are the first pull request merged by the contributor
+     * @return array<string,ReleasePullRequest> an associative array where the keys are the GitHub usernames of the new contributors and the values are the first pull request merged by the contributor
      */
     private function getNewContributors(array $pullRequests, ?DateTimeImmutable $since): array
     {
@@ -401,7 +401,7 @@ class CreateRelease extends BaseCommand
      *
      * The returned pull requests are sorted by creation date in descending order.
      *
-     * @return list<PullRequest>
+     * @return list<ReleasePullRequest>
      */
     private function getMergedPullRequests(Branch $branch, Repository $repository, OutputInterface $output): array
     {
@@ -411,11 +411,17 @@ class CreateRelease extends BaseCommand
         $pullRequests = [];
         foreach ($this->gitHubClient->getMergedPullRequests($branch, $repository) as $pullRequest) {
             $progress->advance();
-            if (!$this->config->filterPullRequest($pullRequest)) {
+            try {
+                $releasePullRequest = ReleasePullRequest::fromPullRequest($pullRequest);
+            } catch (InvalidArgumentException) {
                 continue;
             }
 
-            $pullRequests[] = $pullRequest;
+            if (!$this->config->filterPullRequest($releasePullRequest)) {
+                continue;
+            }
+
+            $pullRequests[] = $releasePullRequest;
         }
 
         $progress->finish('Fetched pull requests');
@@ -424,10 +430,10 @@ class CreateRelease extends BaseCommand
     }
 
     /**
-     * @param list<PullRequest>          $pullRequests
+     * @param list<ReleasePullRequest>   $pullRequests
      * @param array<string,list<string>> $groups
      *
-     * @return array<string,list<PullRequest>>
+     * @return array<string,list<ReleasePullRequest>>
      */
     private function groupedPullRequests(array $pullRequests, array $groups, string $fallbackGroup): array
     {
@@ -440,7 +446,7 @@ class CreateRelease extends BaseCommand
 
         $groupedPullRequests = array_fill_keys([...array_keys($groups), $fallbackGroup], []);
         foreach ($pullRequests as $pullRequest) {
-            $type = $pullRequest->message?->getType()->toString() ?? '';
+            $type = $pullRequest->message->getType()->toString();
             $groupedPullRequests[$groupsByType[$type] ?? $fallbackGroup][] = $pullRequest;
         }
 

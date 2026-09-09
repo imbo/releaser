@@ -4,7 +4,7 @@ namespace ImboReleaser;
 
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
-use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 
 use function dirname;
@@ -49,11 +49,10 @@ class Config implements ConfigInterface
         return true;
     }
 
-    public function filterPullRequest(PullRequest $pullRequest): bool
+    public function filterPullRequest(ReleasePullRequest $pullRequest): bool
     {
         return
-            null !== $pullRequest->message
-            && !in_array($pullRequest->user->login, static::USERNAMES_TO_EXCLUDE, true)
+            !in_array($pullRequest->user->login, static::USERNAMES_TO_EXCLUDE, true)
             && empty(array_intersect(static::PULL_REQUEST_LABELS_TO_EXCLUDE, $pullRequest->labels));
     }
 
@@ -76,10 +75,6 @@ class Config implements ConfigInterface
         $hasFeature = false;
 
         foreach ($pullRequests as $pullRequest) {
-            if (null === $pullRequest->message) {
-                continue;
-            }
-
             if ($pullRequest->message->hasBreakingChanges()) {
                 $hasBreakingChange = true;
                 break;

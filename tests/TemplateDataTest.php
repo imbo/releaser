@@ -4,6 +4,7 @@ namespace ImboReleaser;
 
 use DateTimeImmutable;
 use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\Repository;
 use ImboReleaser\GitHub\User;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -16,8 +17,8 @@ class TemplateDataTest extends TestCase
     {
         $nextVersion = Version::fromString('1.2.3');
         $repository = Repository::fromString('owner/repo');
-        $pr1 = new PullRequest(1, new User('alice'), new DateTimeImmutable(), 'feat: foo', 'main');
-        $pr2 = new PullRequest(2, new User('bob'), new DateTimeImmutable(), 'fix: bar', 'main');
+        $pr1 = ReleasePullRequest::fromPullRequest(new PullRequest(1, new User('alice'), new DateTimeImmutable(), 'feat: foo', 'main'));
+        $pr2 = ReleasePullRequest::fromPullRequest(new PullRequest(2, new User('bob'), new DateTimeImmutable(), 'fix: bar', 'main'));
         $pullRequests = [$pr1, $pr2];
         $groupedPullRequests = ['New Features 🚀' => [$pr1], 'Bug Fixes 🐛' => [$pr2]];
         $newContributors = ['alice' => $pr1];

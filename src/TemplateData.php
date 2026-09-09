@@ -2,7 +2,7 @@
 
 namespace ImboReleaser;
 
-use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\Repository;
 
 class TemplateData
@@ -10,11 +10,11 @@ class TemplateData
     public function __construct(
         private readonly Version $nextVersion,
         private readonly Repository $repository,
-        /** @var list<PullRequest> */
+        /** @var list<ReleasePullRequest> */
         private readonly array $pullRequests,
-        /** @var array<string,list<PullRequest>> */
+        /** @var array<string,list<ReleasePullRequest>> */
         private readonly array $groupedPullRequests,
-        /** @var array<string,PullRequest> */
+        /** @var array<string,ReleasePullRequest> */
         private readonly array $newContributors,
         private readonly ?string $releaserVersion,
     ) {
@@ -23,7 +23,7 @@ class TemplateData
     /**
      * Return the template context as an associative array.
      *
-     * @return array{nextVersion:Version,repository:Repository,pullRequests:list<PullRequest>,groupedPullRequests:array<string,list<PullRequest>>,newContributors:array<string,PullRequest>,releaserVersion:?string}
+     * @return array{nextVersion:Version,repository:Repository,pullRequests:list<ReleasePullRequest>,groupedPullRequests:array<string,list<ReleasePullRequest>>,newContributors:array<string,ReleasePullRequest>,releaserVersion:?string}
      */
     public function toContext(): array
     {

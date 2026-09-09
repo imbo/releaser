@@ -129,25 +129,8 @@ class PullRequestTest extends TestCase
         $this->assertSame('johndoe', $pullRequest->user->login);
         $this->assertSame('2024-01-01T00:00:00+00:00', $pullRequest->mergedAt->format('c'));
         $this->assertStringStartsWith('feat: add new feature', $pullRequest->rawMessage);
-        $this->assertStringStartsWith('feat: add new feature', (string) $pullRequest->message);
-        $this->assertStringContainsString('This is the body of the pull request.', (string) $pullRequest->message);
+        $this->assertStringContainsString('This is the body of the pull request.', $pullRequest->rawMessage);
         $this->assertSame('main', $pullRequest->baseRef);
         $this->assertSame(['bug', 'enhancement'], $pullRequest->labels);
-    }
-
-    public function testFromAPIWithInvalidConventionalCommitMessage(): void
-    {
-        $pullRequest = PullRequest::fromAPI([
-            'number' => 123,
-            'user' => [
-                'login' => 'johndoe',
-            ],
-            'merged_at' => '2024-01-01T00:00:00Z',
-            'title' => 'Some commit message',
-            'base' => [
-                'ref' => 'main',
-            ],
-        ]);
-        $this->assertNull($pullRequest->message);
     }
 }
