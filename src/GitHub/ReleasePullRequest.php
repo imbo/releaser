@@ -32,8 +32,8 @@ final class ReleasePullRequest
     {
         try {
             $message = (new Parser())->parse($pullRequest->rawMessage);
-        } catch (InvalidCommitMessage) {
-            throw new InvalidArgumentException(sprintf('Pull request #%d does not have a valid Conventional Commit message.', $pullRequest->number));
+        } catch (InvalidCommitMessage $e) {
+            throw new InvalidArgumentException(sprintf('Pull request #%d does not have a valid Conventional Commit message.', $pullRequest->number), previous: $e);
         }
 
         return new self(
