@@ -6,6 +6,7 @@ use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\User;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -77,7 +78,6 @@ class ConfigTest extends TestCase
     public static function filterPullRequestProvider(): iterable
     {
         yield 'conventional commit' => ['message' => 'feat: add new feature', 'user' => 'login', 'labels' => [], 'valid' => true];
-        yield 'non-conventional commit' => ['message' => 'Some commit message', 'user' => 'login', 'labels' => [], 'valid' => false];
         yield 'excluded label' => ['message' => 'feat: add new feature', 'user' => 'login', 'labels' => ['skip-release'], 'valid' => false];
         yield 'excluded user' => ['message' => 'feat: add new feature', 'user' => 'dependabot[bot]', 'labels' => [], 'valid' => false];
     }
@@ -88,7 +88,7 @@ class ConfigTest extends TestCase
     #[DataProvider('filterPullRequestProvider')]
     public function testFilterPullRequest(string $message, string $user, array $labels, bool $valid): void
     {
-        $pullRequest = new PullRequest(123, new User($user), new DateTimeImmutable(), $message, 'main', $labels);
+        $pullRequest = ReleasePullRequest::fromPullRequest(new PullRequest(123, new User($user), new DateTimeImmutable(), $message, 'main', $labels));
 
         $this->assertSame($valid, (new Config())->filterPullRequest($pullRequest));
     }
@@ -105,11 +105,6 @@ class ConfigTest extends TestCase
      */
     public static function determineNextVersionProvider(): iterable
     {
-        yield 'no conventional commits' => [
-            'current' => '1.0.0',
-            'titles' => ['some random title'],
-            'expected' => '1.0.1',
-        ];
         yield 'patch changes' => [
             'current' => '1.0.0',
             'titles' => ['fix: some bug'],
@@ -155,7 +150,7 @@ class ConfigTest extends TestCase
     {
         $next = (new Config())->determineNextVersion(
             new ReleaseTag($current, 'sha'),
-            array_map(static fn (string $title) => new PullRequest(123, new User('login'), new DateTimeImmutable(), $title, 'main'), $titles),
+            array_map(static fn (string $title) => ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('login'), new DateTimeImmutable(), $title, 'main')), $titles),
         );
         $this->assertSame($expected, (string) $next);
     }

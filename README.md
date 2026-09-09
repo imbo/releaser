@@ -183,14 +183,14 @@ To use a custom template, either override `template()` in your config or pass `-
 
 The following variables are available in all templates:
 
-| Variable              | Type                              | Description                                                                                                                             |
-| --------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `nextVersion`         | `Version`                         | The next version being released (e.g. `1.2.0`)                                                                                          |
-| `repository`          | `Repository`                      | The GitHub repository                                                                                                                   |
-| `pullRequests`        | `list<PullRequest>`               | All filtered pull requests included in this release                                                                                     |
-| `groupedPullRequests` | `array<string,list<PullRequest>>` | Pull requests grouped by their Conventional Commit type label, as defined by `pullRequestGroups()` and `fallbackGroup()` in your config |
-| `newContributors`     | `array<string,PullRequest>`       | Map of username to their first pull request, for contributors making their first contribution in this release                           |
-| `releaserVersion`     | `?string`                         | Installed Imbo Releaser version, or `null` when Composer metadata is unavailable                                                        |
+| Variable              | Type                                     | Description                                                                                                                             |
+| --------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `nextVersion`         | `Version`                                | The next version being released (e.g. `1.2.0`)                                                                                          |
+| `repository`          | `Repository`                             | The GitHub repository                                                                                                                   |
+| `pullRequests`        | `list<ReleasePullRequest>`               | All filtered pull requests included in this release                                                                                     |
+| `groupedPullRequests` | `array<string,list<ReleasePullRequest>>` | Pull requests grouped by their Conventional Commit type label, as defined by `pullRequestGroups()` and `fallbackGroup()` in your config |
+| `newContributors`     | `array<string,ReleasePullRequest>`       | Map of username to their first pull request, for contributors making their first contribution in this release                           |
+| `releaserVersion`     | `?string`                                | Installed Imbo Releaser version, or `null` when Composer metadata is unavailable                                                        |
 
 ## Version calculation
 

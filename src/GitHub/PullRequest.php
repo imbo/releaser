@@ -5,9 +5,6 @@ namespace ImboReleaser\GitHub;
 use DateMalformedStringException;
 use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
-use Ramsey\ConventionalCommits\Exception\InvalidCommitMessage;
-use Ramsey\ConventionalCommits\Message;
-use Ramsey\ConventionalCommits\Parser;
 
 use function is_array;
 use function is_int;
@@ -16,8 +13,6 @@ use function sprintf;
 
 final class PullRequest
 {
-    public readonly ?Message $message;
-
     public function __construct(
         public readonly int $number,
         public readonly User $user,
@@ -27,11 +22,6 @@ final class PullRequest
         /** @var list<string> */
         public readonly array $labels = [],
     ) {
-        try {
-            $this->message = (new Parser())->parse($rawMessage);
-        } catch (InvalidCommitMessage) {
-            $this->message = null;
-        }
     }
 
     /**

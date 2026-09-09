@@ -3,7 +3,7 @@
 namespace ImboReleaser;
 
 use ImboReleaser\GitHub\Branch;
-use ImboReleaser\GitHub\PullRequest;
+use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 
 interface ConfigInterface
@@ -39,14 +39,14 @@ interface ConfigInterface
     public function filterTag(ReleaseTag $tag): bool;
 
     /**
-     * Determine whether a pull request should be included in the release process.
+     * Determine whether a release pull request should be included in the release process.
      */
-    public function filterPullRequest(PullRequest $pullRequest): bool;
+    public function filterPullRequest(ReleasePullRequest $pullRequest): bool;
 
     /**
      * Determine the version of the next release.
      *
-     * @param list<PullRequest> $pullRequests
+     * @param list<ReleasePullRequest> $pullRequests
      */
     public function determineNextVersion(ReleaseTag $currentTag, array $pullRequests): Version;
 
