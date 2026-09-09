@@ -326,6 +326,68 @@ class CreateReleaseTest extends TestCase
         $this->assertCount(2, $history);
     }
 
+    public function testFilteredPrereleaseTagStillAdvancesPrereleaseNumber(): void
+    {
+        $config = new class extends Config {
+            public function filterTag(ReleaseTag $tag): bool
+            {
+                return !$tag->version->isPrerelease();
+            }
+        };
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([
+                ['name' => 'v0.1.0-rc.1', 'commit' => ['sha' => 'tagSha']],
+            ])),
+        );
+        $command = $this->createCommand($guzzleClient, $config);
+        $commandTester = new CommandTester($command);
+        $commandTester->execute([
+            '--repository' => 'owner/repo',
+            '--branch' => 'main',
+            '--prerelease' => 'rc',
+            '--no-edit' => true,
+            '--dry-run' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringContainsString('with tag "v0.1.0-rc.2"', $commandTester->getDisplay());
+    }
+
+    public function testRejectsExistingTagExcludedByFilter(): void
+    {
+        $config = new class extends Config {
+            public function filterTag(ReleaseTag $tag): bool
+            {
+                return false;
+            }
+        };
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'user1'],
+                'title' => 'feat: new feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([
+                ['name' => 'v0.1.0', 'commit' => ['sha' => 'tagSha']],
+            ])),
+        );
+        $command = $this->createCommand($guzzleClient, $config);
+        $commandTester = new CommandTester($command);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Tag "v0.1.0" already exists in repository "owner/repo".');
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+    }
+
     public function testReleaseWithExistingTag(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(

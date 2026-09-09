@@ -34,7 +34,10 @@ interface ConfigInterface
     public function filterBranch(Branch $branch): bool;
 
     /**
-     * Determine whether a valid release tag should be included in the release process.
+     * Determine whether a valid release tag belongs to the release stream being created.
+     *
+     * Tags excluded by this filter are not considered when choosing the previous release. They
+     * still prevent reuse of an existing tag name and are considered for prerelease numbering.
      */
     public function filterTag(ReleaseTag $tag): bool;
 
