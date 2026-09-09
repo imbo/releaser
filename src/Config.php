@@ -14,17 +14,9 @@ use const DIRECTORY_SEPARATOR;
 
 class Config implements ConfigInterface
 {
-    protected const string INITIAL_VERSION = 'v0.1.0';
-    /** @var list<string> */
-    protected const array USERNAMES_TO_EXCLUDE = ['dependabot[bot]'];
-    /** @var list<string> */
-    protected const array MAIN_BRANCH_NAMES = ['main', 'master'];
-    /** @var list<string> */
-    protected const array PULL_REQUEST_LABELS_TO_EXCLUDE = ['skip-release'];
-
     public function initialVersion(): Version
     {
-        return Version::fromString(static::INITIAL_VERSION);
+        return Version::fromString($this->initialVersionString());
     }
 
     public function gitHubRepository(): ?string
@@ -40,7 +32,7 @@ class Config implements ConfigInterface
     public function filterBranch(Branch $branch): bool
     {
         return
-            in_array($branch->name, static::MAIN_BRANCH_NAMES, true)
+            in_array($branch->name, $this->mainBranchNames(), true)
             || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/', $branch->name);
     }
 
@@ -52,8 +44,8 @@ class Config implements ConfigInterface
     public function filterPullRequest(ReleasePullRequest $pullRequest): bool
     {
         return
-            !in_array($pullRequest->user->login, static::USERNAMES_TO_EXCLUDE, true)
-            && empty(array_intersect(static::PULL_REQUEST_LABELS_TO_EXCLUDE, $pullRequest->labels));
+            !in_array($pullRequest->user->login, $this->usernamesToExclude(), true)
+            && empty(array_intersect($this->pullRequestLabelsToExclude(), $pullRequest->labels));
     }
 
     /**
@@ -126,11 +118,6 @@ class Config implements ConfigInterface
         return dirname(__DIR__).DIRECTORY_SEPARATOR.'templates'.DIRECTORY_SEPARATOR.'default.twig';
     }
 
-    private function isMainBranch(Branch $branch): bool
-    {
-        return in_array($branch->name, static::MAIN_BRANCH_NAMES, true);
-    }
-
     public function pullRequestGroups(): array
     {
         return [
@@ -148,5 +135,39 @@ class Config implements ConfigInterface
     public function editor(): string
     {
         return 'vi';
+    }
+
+    protected function initialVersionString(): string
+    {
+        return 'v0.1.0';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function usernamesToExclude(): array
+    {
+        return ['dependabot[bot]'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function mainBranchNames(): array
+    {
+        return ['main', 'master'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function pullRequestLabelsToExclude(): array
+    {
+        return ['skip-release'];
+    }
+
+    private function isMainBranch(Branch $branch): bool
+    {
+        return in_array($branch->name, $this->mainBranchNames(), true);
     }
 }

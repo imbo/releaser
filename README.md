@@ -154,6 +154,22 @@ return new class extends Config {
 };
 ```
 
+### Extending default policies
+
+Override the protected default-provider methods to add to the built-in branch names, excluded usernames, or excluded pull request labels. Call the parent method to retain future defaults:
+
+```php
+return new class extends Config {
+    protected function usernamesToExclude(): array
+    {
+        return [
+            ...parent::usernamesToExclude(),
+            'renovate[bot]',
+        ];
+    }
+};
+```
+
 ### Where the configuration is loaded from
 
 You can point to an explicit config file with the `--config` / `-c` option. Otherwise the configuration is resolved from the following locations, in order, and the first match wins:
