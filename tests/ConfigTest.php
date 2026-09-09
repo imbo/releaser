@@ -36,6 +36,36 @@ class ConfigTest extends TestCase
         $this->assertSame('vi', $config->editor());
     }
 
+    public function testDefaultPoliciesCanBeExtended(): void
+    {
+        $config = new class extends Config {
+            protected function initialVersionString(): string
+            {
+                return 'v1.0.0';
+            }
+
+            protected function usernamesToExclude(): array
+            {
+                return [...parent::usernamesToExclude(), 'renovate[bot]'];
+            }
+
+            protected function mainBranchNames(): array
+            {
+                return [...parent::mainBranchNames(), 'trunk'];
+            }
+
+            protected function pullRequestLabelsToExclude(): array
+            {
+                return [...parent::pullRequestLabelsToExclude(), 'no-release'];
+            }
+        };
+
+        $this->assertSame('v1.0.0', (string) $config->initialVersion());
+        $this->assertTrue($config->filterBranch(new Branch('trunk')));
+        $this->assertFalse($config->filterPullRequest(ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('renovate[bot]'), new DateTimeImmutable(), 'fix: update dependency', 'main'))));
+        $this->assertFalse($config->filterPullRequest(ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('login'), new DateTimeImmutable(), 'fix: update dependency', 'main', ['no-release']))));
+    }
+
     /**
      * @return iterable<string,array{branchName:string,valid:bool}>
      */
