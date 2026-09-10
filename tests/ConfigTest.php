@@ -232,6 +232,46 @@ class ConfigTest extends TestCase
             ],
             'expectedTagName' => 'v2.0.1',
         ];
+        yield 'major maintenance branch' => [
+            'branchName' => '2.x',
+            'tagNames' => [
+                'v1.0.0',
+                'v2.0.0',
+                'v2.1.0',
+                'v3.0.0',
+            ],
+            'expectedTagName' => 'v2.1.0',
+        ];
+        yield 'prefixed major maintenance branch' => [
+            'branchName' => 'v2.x',
+            'tagNames' => [
+                'v1.0.0',
+                'v2.0.0',
+                'v2.1.0',
+                'v3.0.0',
+            ],
+            'expectedTagName' => 'v2.1.0',
+        ];
+        yield 'minor maintenance branch' => [
+            'branchName' => '2.3.x',
+            'tagNames' => [
+                'v2.2.0',
+                'v2.3.0',
+                'v2.3.1',
+                'v2.4.0',
+            ],
+            'expectedTagName' => 'v2.3.1',
+        ];
+        yield 'prefixed minor maintenance branch' => [
+            'branchName' => 'v2.3.x',
+            'tagNames' => [
+                'v2.2.0',
+                'v2.3.0',
+                'v2.3.1',
+                'v2.4.0',
+            ],
+            'expectedTagName' => 'v2.3.1',
+        ];
         yield 'no match' => [
             'branchName' => 'v2',
             'tagNames' => [

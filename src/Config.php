@@ -103,9 +103,10 @@ class Config implements ConfigInterface
             return $tags[0];
         }
 
+        $branchName = rtrim(ltrim($branch->name, 'v'), '.x');
         foreach ($tags as $tag) {
-            // Match maintenance branches such as v2 or 2.x to tags such as v2.1.0 or 2.1.0.
-            if (str_starts_with(ltrim($tag->name, 'v'), ltrim($branch->name, 'v').'.')) {
+            // Match maintenance branches such as v2, 2.x, or v2.3.x to tags such as v2.3.1 or 2.3.1.
+            if (str_starts_with(ltrim($tag->name, 'v'), $branchName.'.')) {
                 return $tag;
             }
         }
