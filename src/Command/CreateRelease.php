@@ -201,7 +201,6 @@ class CreateRelease extends BaseCommand
             $pullRequestsInRelease = $pullRequests;
         } else {
             $since = $this->gitHubClient->getShaDateTime($repository, $tag->sha);
-            $nextVersion = $this->config->determineNextVersion($tag, $pullRequests);
             $pullRequestsInRelease = [];
             foreach ($pullRequests as $pullRequest) {
                 if ($pullRequest->mergedAt <= $since) {
@@ -210,6 +209,12 @@ class CreateRelease extends BaseCommand
 
                 $pullRequestsInRelease[] = $pullRequest;
             }
+
+            if ([] === $pullRequestsInRelease) {
+                throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
+            }
+
+            $nextVersion = $this->config->determineNextVersion($tag, $pullRequestsInRelease);
         }
 
         /** @var ?string */
@@ -222,10 +227,6 @@ class CreateRelease extends BaseCommand
             if ($tag->name === (string) $nextVersion) {
                 throw new RuntimeException(sprintf('Tag "%s" already exists in repository "%s".', $nextVersion, $repository));
             }
-        }
-
-        if ([] === $pullRequestsInRelease) {
-            throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
         }
 
         $releaseNotes = $this->generateReleaseNotes($template, new TemplateData(
