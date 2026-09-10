@@ -428,6 +428,10 @@ class CreateReleaseTest extends TestCase
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertStringContainsString('Release created', $commandTester->getDisplay());
         $this->assertCount(7, $history);
+
+        /** @var array{tag:string} $tagData */
+        $tagData = json_decode($history[4]['request']->getBody()->getContents(), true);
+        $this->assertSame('v1.0.1', $tagData['tag']);
     }
 
     public function testDryRunDoesNotCreateRelease(): void
