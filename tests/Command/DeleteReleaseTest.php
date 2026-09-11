@@ -76,6 +76,38 @@ class DeleteReleaseTest extends TestCase
         $this->assertSame('DELETE', $history[2]['request']->getMethod());
     }
 
+    public function testDeleteReleasePreservesZeroPrerelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => 'v1.2.3-0'])),
+            new Response(204),
+            new Response(204),
+        );
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+        $commandTester->execute(['--repository' => 'owner/repo', 'version' => 'v1.2.3-0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertCount(3, $history);
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases/tags/v1.2.3-0', (string) $history[0]['request']->getUri());
+        $this->assertSame('DELETE', $history[1]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases/42', (string) $history[1]['request']->getUri());
+        $this->assertSame('DELETE', $history[2]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/v1.2.3-0', (string) $history[2]['request']->getUri());
+    }
+
+    public function testDeleteTagOnlyPreservesZeroPrerelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+        $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => 'v1.2.3-0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertCount(1, $history);
+        $this->assertSame('DELETE', $history[0]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/v1.2.3-0', (string) $history[0]['request']->getUri());
+    }
+
     public function testDeleteTagOnly(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
