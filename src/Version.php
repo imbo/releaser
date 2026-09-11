@@ -88,7 +88,7 @@ final class Version implements Stringable
      */
     public static function fromString(string $version): self
     {
-        if (!preg_match('/^(?P<prefix>.*?)(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/', $version, $matches)) {
+        if (!preg_match('/^(?P<prefix>.*?\D)?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/', $version, $matches)) {
             throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
         }
 

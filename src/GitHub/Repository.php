@@ -5,7 +5,7 @@ namespace ImboReleaser\GitHub;
 use ImboReleaser\Exception\InvalidArgumentException;
 use Stringable;
 
-use function count;
+use function preg_match;
 use function sprintf;
 
 final class Repository implements Stringable
@@ -28,11 +28,17 @@ final class Repository implements Stringable
 
     public static function fromString(string $repository): self
     {
-        $parts = explode('/', $repository);
-        if (2 !== count($parts)) {
+        if (!self::isValid($repository)) {
             throw new InvalidArgumentException(sprintf('Invalid repository string "%s", expected format "owner/repo"', $repository));
         }
 
-        return new self($parts[0], $parts[1]);
+        [$owner, $repo] = explode('/', $repository);
+
+        return new self($owner, $repo);
+    }
+
+    public static function isValid(string $repository): bool
+    {
+        return 1 === preg_match('#^[^\s/]+/[^\s/]+$#', $repository);
     }
 }
