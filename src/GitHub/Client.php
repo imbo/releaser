@@ -85,7 +85,7 @@ final class Client
      *
      * Drafts and pull requests missing either a user or a merged timestamp are skipped.
      *
-     * The returned pull requests are sorted by creation date in descending order.
+     * The returned pull requests use GitHub's creation-date descending order.
      *
      * @see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2026-03-10#list-pull-requests
      *

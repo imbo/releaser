@@ -30,6 +30,7 @@ use Twig\Loader\FilesystemLoader;
 use function count;
 use function dirname;
 use function sprintf;
+use function usort;
 
 #[AsCommand(
     name: CreateRelease::NAME,
@@ -300,6 +301,8 @@ class CreateRelease extends BaseCommand
      */
     private function getNewContributors(array $pullRequests, ?DateTimeImmutable $since): array
     {
+        usort($pullRequests, static fn (ReleasePullRequest $a, ReleasePullRequest $b): int => $b->mergedAt <=> $a->mergedAt);
+
         $newContributors = [];
         foreach ($pullRequests as $pullRequest) {
             if (null !== $since && $pullRequest->mergedAt <= $since) {
