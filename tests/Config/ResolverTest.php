@@ -35,6 +35,19 @@ class ResolverTest extends TestCase
         (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/missing-config.php');
     }
 
+    public function testFailsWhenAutomaticallyDiscoveredConfigIsInvalid(): void
+    {
+        $resolver = new Resolver(
+            new Config(),
+            dirname(__DIR__).'/fixtures/invalid-config',
+            dirname(__DIR__).'/fixtures/config-home',
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('invalid-config/.imbo-releaser.php" does not return a valid configuration');
+        $resolver->getConfig();
+    }
+
     /**
      * @return iterable<string,array{default:ConfigInterface,expectedVersion:string,expectedConfigFilePath:?string,cwd:?string,configFile:?string,configHome:?string}>
      */

@@ -2,6 +2,7 @@
 
 namespace ImboReleaser\GitHub;
 
+use Closure;
 use Symfony\Component\Dotenv\Dotenv;
 use Symfony\Component\Process\Process;
 
@@ -10,10 +11,21 @@ use function is_string;
 class TokenResolver
 {
     private readonly ?string $cwd;
+    /** @var Closure():?string */
+    private readonly Closure $gitHubCliOutput;
 
-    public function __construct(?string $cwd = null)
+    /**
+     * @param ?Closure():?string $gitHubCliOutput
+     */
+    public function __construct(?string $cwd = null, ?Closure $gitHubCliOutput = null)
     {
         $this->cwd = $cwd ?? (getcwd() ?: null);
+        $this->gitHubCliOutput = $gitHubCliOutput ?? static function (): ?string {
+            $process = new Process(['gh', 'auth', 'token']);
+            $process->run();
+
+            return $process->isSuccessful() ? $process->getOutput() : null;
+        };
     }
 
     /**
@@ -37,17 +49,13 @@ class TokenResolver
             return $token;
         }
 
-        // @codeCoverageIgnoreStart
-        $process = new Process(['gh', 'auth', 'token']);
-        $process->run();
-        if ($process->isSuccessful()) {
-            $token = trim($process->getOutput());
-            if ('' !== $token) {
-                return $token;
-            }
+        $token = ($this->gitHubCliOutput)();
+        if (null === $token) {
+            return null;
         }
 
-        return null;
-        // @codeCoverageIgnoreEnd
+        $token = trim($token);
+
+        return '' !== $token ? $token : null;
     }
 }

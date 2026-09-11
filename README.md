@@ -170,6 +170,8 @@ return new class extends Config {
 };
 ```
 
+By default, pull requests authored by `dependabot[bot]` and pull requests labelled `skip-release` are excluded. Excluded pull requests are not included in release notes and do not affect the calculated version.
+
 ### Where the configuration is loaded from
 
 You can point to an explicit config file with the `--config` / `-c` option. Otherwise the configuration is resolved from the following locations, in order, and the first match wins:
