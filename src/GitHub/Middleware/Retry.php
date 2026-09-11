@@ -18,7 +18,7 @@ final class Retry
 
     public function decide(int $retries, RequestInterface $request, ?ResponseInterface $response, mixed $exception): bool
     {
-        if ($retries >= $this->maxRetries) {
+        if ('GET' !== $request->getMethod() || $retries >= $this->maxRetries) {
             return false;
         }
 
