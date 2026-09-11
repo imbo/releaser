@@ -52,15 +52,28 @@ jobs:
           php-version: "8.3"
       - run: composer install
       - run: composer audit
+  distribution-archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: git archive --format=tar HEAD > package.tar
+      - run: tar -tf package.tar > package-files.txt
+      - run: grep -qx imbo-releaser package-files.txt
+      - run: grep -qx composer.json package-files.txt
+      - run: grep -qx src/ package-files.txt
+      - run: grep -qx templates/ package-files.txt
+      - run: >-
+          ! grep -Eq '^(\.github|build|hack|scripts|tests)(/|$)|^(AGENTS\.md|\.gitattributes|\.gitignore|\.imbo-releaser\.dist\.php|\.php-cs-fixer\.dist\.php|phpstan\.dist\.neon|phpunit\.dist\.xml)$' package-files.txt
   branch-protection:
     needs:
       - validate-pr-title
       - tests-and-qa
       - composer-audit
+      - distribution-archive
     if: ${{ always() }}
     runs-on: ubuntu-latest
     name: Branch protection
     steps:
-      - if: ${{ needs.validate-pr-title.result != 'success' || needs.tests-and-qa.result != 'success' || needs.composer-audit.result != 'success'}}
+      - if: ${{ needs.validate-pr-title.result != 'success' || needs.tests-and-qa.result != 'success' || needs.composer-audit.result != 'success' || needs.distribution-archive.result != 'success'}}
         run: exit 1
       - run: echo "All checks passed."

@@ -1,0 +1,15 @@
+*                       text eol=lf
+*.php                   diff=php
+
+.github                 export-ignore
+build                   export-ignore
+hack                    export-ignore
+scripts                 export-ignore
+tests                   export-ignore
+AGENTS.md               export-ignore
+.gitattributes          export-ignore
+.gitignore              export-ignore
+.imbo-releaser.dist.php export-ignore
+.php-cs-fixer.dist.php  export-ignore
+phpstan.dist.neon       export-ignore
+phpunit.dist.xml        export-ignore

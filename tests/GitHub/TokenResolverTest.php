@@ -59,4 +59,30 @@ class TokenResolverTest extends TestCase
         $resolver = new TokenResolver($this->tmpDir);
         $this->assertSame('env-token', $resolver->getGitHubToken());
     }
+
+    public function testResolvesFromGitHubCli(): void
+    {
+        $resolver = $this->tokenResolver("github-cli-token\n");
+
+        $this->assertSame('github-cli-token', $resolver->getGitHubToken());
+    }
+
+    public function testReturnsNullWhenGitHubCliFails(): void
+    {
+        $resolver = $this->tokenResolver(null);
+
+        $this->assertNull($resolver->getGitHubToken());
+    }
+
+    public function testReturnsNullWhenGitHubCliReturnsEmptyOutput(): void
+    {
+        $resolver = $this->tokenResolver(" \n");
+
+        $this->assertNull($resolver->getGitHubToken());
+    }
+
+    private function tokenResolver(?string $token): TokenResolver
+    {
+        return new TokenResolver($this->tmpDir, static fn (): ?string => $token);
+    }
 }

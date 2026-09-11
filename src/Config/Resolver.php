@@ -146,8 +146,10 @@ final class Resolver
             throw new InvalidArgumentException(sprintf('Config file "%s" could not be loaded: %s', $file, $e->getMessage()), previous: $e);
         }
 
-        return $config instanceof ConfigInterface
-            ? [$config, $file]
-            : null;
+        if (!$config instanceof ConfigInterface) {
+            throw new InvalidArgumentException(sprintf('Config file "%s" does not return a valid configuration', $file));
+        }
+
+        return [$config, $file];
     }
 }
