@@ -24,7 +24,7 @@ final class Version implements Stringable
 
     public function __toString(): string
     {
-        return ($this->prefix ?? '').$this->major.'.'.$this->minor.'.'.$this->patch.($this->prerelease ? '-'.$this->prerelease : '');
+        return ($this->prefix ?? '').$this->major.'.'.$this->minor.'.'.$this->patch.(null !== $this->prerelease ? '-'.$this->prerelease : '');
     }
 
     public function incrementMajor(): self

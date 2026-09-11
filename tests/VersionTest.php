@@ -154,6 +154,10 @@ class VersionTest extends TestCase
             'input' => 'v1.2.3-rc.1',
             'expected' => 'v1.2.3-rc.1',
         ];
+        yield 'zero prerelease' => [
+            'input' => 'v1.2.3-0',
+            'expected' => 'v1.2.3-0',
+        ];
     }
 
     #[DataProvider('fromStringProvider')]
