@@ -172,7 +172,7 @@ abstract class BaseCommand extends Command
         $question =
             (new Question('Specify the repository (owner/repo): '))
             ->setValidator(static function ($answer): string {
-                if (!is_string($answer) || 0 === preg_match('#^[^\s/]+/[^\s/]+$#', $answer)) {
+                if (!is_string($answer) || !Repository::isValid($answer)) {
                     throw new InvalidArgumentException('The repository must be in the format "owner/repo".');
                 }
 

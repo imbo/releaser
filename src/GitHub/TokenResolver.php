@@ -21,10 +21,12 @@ class TokenResolver
     {
         $this->cwd = $cwd ?? (getcwd() ?: null);
         $this->gitHubCliOutput = $gitHubCliOutput ?? static function (): ?string {
+            // @codeCoverageIgnoreStart
             $process = new Process(['gh', 'auth', 'token']);
             $process->run();
 
             return $process->isSuccessful() ? $process->getOutput() : null;
+            // @codeCoverageIgnoreEnd
         };
     }
 

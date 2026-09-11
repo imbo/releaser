@@ -4,6 +4,7 @@ namespace ImboReleaser\GitHub;
 
 use ImboReleaser\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Repository::class)]
@@ -22,10 +23,36 @@ class RepositoryTest extends TestCase
         $this->assertSame('releaser', $repository->repo);
     }
 
-    public function testFromStringWithInvalidString(): void
+    /**
+     * @return iterable<string,array{repository:string}>
+     */
+    public static function invalidRepositoryProvider(): iterable
+    {
+        yield 'missing separator' => ['repository' => 'invalid-repo-string'];
+        yield 'missing owner' => ['repository' => '/repo'];
+        yield 'missing repository' => ['repository' => 'owner/'];
+        yield 'owner contains whitespace' => ['repository' => 'owner name/repo'];
+        yield 'repository contains whitespace' => ['repository' => 'owner/repo name'];
+        yield 'additional path segment' => ['repository' => 'owner/repo/path'];
+    }
+
+    #[DataProvider('invalidRepositoryProvider')]
+    public function testFromStringWithInvalidString(string $repository): void
     {
         $this->expectException(InvalidArgumentException::class);
-        Repository::fromString('invalid-repo-string');
+        $this->expectExceptionMessage('expected format "owner/repo"');
+        Repository::fromString($repository);
+    }
+
+    #[DataProvider('invalidRepositoryProvider')]
+    public function testInvalidRepositoryStringIsNotValid(string $repository): void
+    {
+        $this->assertFalse(Repository::isValid($repository));
+    }
+
+    public function testValidRepositoryStringIsValid(): void
+    {
+        $this->assertTrue(Repository::isValid('imbo/releaser'));
     }
 
     public function testUrl(): void

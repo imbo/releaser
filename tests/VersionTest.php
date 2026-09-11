@@ -172,6 +172,9 @@ class VersionTest extends TestCase
         yield 'invalid string' => ['input' => 'foo'];
         yield 'empty string' => ['input' => ''];
         yield 'invalid patch' => ['input' => 'v1.2.x'];
+        yield 'leading zero major' => ['input' => '01.2.3'];
+        yield 'leading zero minor' => ['input' => '1.02.3'];
+        yield 'leading zero patch' => ['input' => '1.2.03'];
         yield 'empty prerelease' => ['input' => 'v1.2.3-'];
         yield 'invalid prerelease' => ['input' => 'v1.2.3-rc_1'];
     }
