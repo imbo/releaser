@@ -434,6 +434,52 @@ class CreateReleaseTest extends TestCase
         $this->assertSame('v1.0.1', $tagData['tag']);
     }
 
+    public function testNewContributorsAreDeterminedByMergeDate(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                // Created last but merged before the previous release.
+                'number' => 3,
+                'user' => ['login' => 'alice'],
+                'title' => 'fix: earlier contribution',
+                'merged_at' => '2024-01-10T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ], [
+                // Created before #3 but merged after the previous release.
+                'number' => 2,
+                'user' => ['login' => 'alice'],
+                'title' => 'fix: later contribution',
+                'merged_at' => '2024-03-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ], [
+                // Created first and merged after the previous release.
+                'number' => 1,
+                'user' => ['login' => 'bob'],
+                'title' => 'fix: new contribution',
+                'merged_at' => '2024-03-02T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests (creation date descending)
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])), // tags
+            new Response(200, [], $this->json([
+                'committer' => ['date' => '2024-02-01T00:00:00Z'],
+            ])), // previous release commit
+        );
+        $command = $this->createCommand($guzzleClient);
+        $commandTester = new CommandTester($command);
+        $commandTester->execute([
+            '--repository' => 'owner/repo',
+            '--branch' => 'main',
+            '--no-edit' => true,
+            '--dry-run' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $this->assertStringNotContainsString('@alice made their first contribution', $commandTester->getDisplay());
+        $this->assertStringContainsString('@bob made their first contribution', $commandTester->getDisplay());
+    }
+
     public function testDryRunDoesNotCreateRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
