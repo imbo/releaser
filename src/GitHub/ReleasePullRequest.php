@@ -22,6 +22,7 @@ final class ReleasePullRequest
         public readonly Message $message,
         public readonly string $baseRef,
         public readonly array $labels = [],
+        public readonly ?string $mergeCommitSha = null,
     ) {
     }
 
@@ -43,6 +44,7 @@ final class ReleasePullRequest
             $message,
             $pullRequest->baseRef,
             $pullRequest->labels,
+            $pullRequest->mergeCommitSha,
         );
     }
 }

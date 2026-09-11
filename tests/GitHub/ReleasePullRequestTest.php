@@ -12,7 +12,7 @@ class ReleasePullRequestTest extends TestCase
 {
     public function testCreatesReleasePullRequest(): void
     {
-        $pullRequest = new PullRequest(123, new User('johndoe'), new DateTimeImmutable('2024-01-01'), 'feat: add new feature', 'main', ['enhancement']);
+        $pullRequest = new PullRequest(123, new User('johndoe'), new DateTimeImmutable('2024-01-01'), 'feat: add new feature', 'main', ['enhancement'], 'mergeSha');
         $releasePullRequest = ReleasePullRequest::fromPullRequest($pullRequest);
 
         $this->assertSame($pullRequest->number, $releasePullRequest->number);
@@ -21,6 +21,7 @@ class ReleasePullRequestTest extends TestCase
         $this->assertStringStartsWith('feat: add new feature', (string) $releasePullRequest->message);
         $this->assertSame($pullRequest->baseRef, $releasePullRequest->baseRef);
         $this->assertSame($pullRequest->labels, $releasePullRequest->labels);
+        $this->assertSame('mergeSha', $releasePullRequest->mergeCommitSha);
     }
 
     public function testRejectsPullRequestWithoutConventionalCommitMessage(): void

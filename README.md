@@ -60,6 +60,8 @@ imbo-releaser create --help
 
 This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created.
 
+When a previous tag exists, pull requests are included by matching their merge commit SHAs against the commits added since that tag. Merge and commit timestamps are not used to decide release membership, so differences between those timestamps cannot cause a previously released pull request to be included again. Pull requests without a merge commit SHA are skipped when calculating this range and do not affect the release notes or version bump.
+
 Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
 
 Pass `--prerelease <identifier>` to create a prerelease, for example `--prerelease rc` creates `v1.2.3-rc.1`. Repeating the command with the same identifier increments the prerelease number, such as `v1.2.3-rc.2`. Run the command without `--prerelease` to create the stable release; prerelease tags do not affect stable version calculation.

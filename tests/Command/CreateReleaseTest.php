@@ -281,20 +281,152 @@ class CreateReleaseTest extends TestCase
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: old feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
+                'merge_commit_sha' => 'tagsha',
                 'base' => ['ref' => 'main'],
             ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
             ])), // tags
             new Response(200, [], $this->json([
-                'committer' => ['date' => '2024-01-02T00:00:00Z'],
-            ])), // commit date for tag (after the PR merged_at)
+                'commits' => [],
+            ])), // no commits since the tag
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('No pull requests found for the release.');
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+    }
+
+    public function testReleaseMembershipUsesCommitsInsteadOfTimestamps(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([
+                [
+                    'number' => 3,
+                    'user' => ['login' => 'alice'],
+                    'title' => 'fix: new fix',
+                    'merged_at' => '2024-01-01T00:00:00Z',
+                    'merge_commit_sha' => 'newFixSha',
+                    'base' => ['ref' => 'main'],
+                ],
+                [
+                    'number' => 2,
+                    'user' => ['login' => 'bob'],
+                    'title' => 'fix: fix with an earlier timestamp',
+                    'merged_at' => '2023-12-31T23:59:59Z',
+                    'merge_commit_sha' => 'earlierFixSha',
+                    'base' => ['ref' => 'main'],
+                ],
+                [
+                    'number' => 1,
+                    'user' => ['login' => 'alice'],
+                    'title' => 'feat!: already released breaking change',
+                    // GitHub recorded the merge one second after the tagged commit.
+                    'merged_at' => '2024-01-01T00:00:01Z',
+                    'merge_commit_sha' => 'tagsha',
+                    'base' => ['ref' => 'main'],
+                ],
+            ])),
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])),
+            new Response(200, [], $this->json([
+                'base_commit' => ['sha' => 'tagsha', 'commit' => ['committer' => ['date' => '2024-01-01T00:00:00Z']]],
+                'commits' => [['sha' => 'earlierFixSha'], ['sha' => 'newFixSha']],
+            ])),
+        );
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $display = $commandTester->getDisplay();
+        $this->assertStringContainsString('with tag "v1.0.1"', $display);
+        $this->assertStringContainsString('new fix', $display);
+        $this->assertStringContainsString('fix with an earlier timestamp', $display);
+        $this->assertStringNotContainsString('already released breaking change', $display);
+        $this->assertStringNotContainsString('@alice made their first contribution', $display);
+        $this->assertStringContainsString('@bob made their first contribution', $display);
+        $this->assertCount(3, $history);
+        $this->assertSame('/repos/owner/repo/compare/tagsha...main?per_page=100', (string) $history[2]['request']->getUri());
+    }
+
+    public function testAlreadyReleasedPullRequestWithLaterMergeTimestampDoesNotCreateRelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 84,
+                'user' => ['login' => 'alice'],
+                'title' => 'feat!: already released change',
+                'merged_at' => '2026-09-11T05:44:09Z',
+                'merge_commit_sha' => 'tagsha',
+                'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])),
+            new Response(200, [], $this->json([
+                'base_commit' => ['sha' => 'tagsha', 'commit' => ['committer' => ['date' => '2026-09-11T05:44:08Z']]],
+                'commits' => [],
+            ])),
+        );
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No pull requests found for the release.');
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
+        } finally {
+            $this->assertCount(3, $history);
+            foreach ($history as $transaction) {
+                $this->assertSame('GET', $transaction['request']->getMethod());
+            }
+        }
+    }
+
+    public function testSkipsPullRequestsWithoutMergeCommitSha(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'alice'],
+                'title' => 'feat!: change with null SHA',
+                'merged_at' => '2024-01-02T00:00:00Z',
+                'merge_commit_sha' => null,
+                'base' => ['ref' => 'main'],
+            ], [
+                'number' => 2,
+                'user' => ['login' => 'bob'],
+                'title' => 'feat: change with missing SHA',
+                'merged_at' => '2024-01-02T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ], [
+                'number' => 3,
+                'user' => ['login' => 'charlie'],
+                'title' => 'fix: included fix',
+                'merged_at' => '2024-01-03T00:00:00Z',
+                'merge_commit_sha' => 'fixSha',
+                'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([
+                ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
+            ])),
+            new Response(200, [], $this->json(['commits' => [['sha' => 'fixSha']]])),
+        );
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
+        $display = $commandTester->getDisplay();
+        $this->assertStringContainsString('with tag "v1.0.1"', $display);
+        $this->assertStringContainsString('included fix', $display);
+        $this->assertStringNotContainsString('change with null SHA', $display);
+        $this->assertStringNotContainsString('change with missing SHA', $display);
+        $this->assertStringNotContainsString('@alice made their first contribution', $display);
+        $this->assertStringNotContainsString('@bob made their first contribution', $display);
+        $this->assertStringContainsString('@charlie made their first contribution', $display);
+        $this->assertCount(3, $history);
     }
 
     public function testFilterTag(): void
@@ -396,20 +528,22 @@ class CreateReleaseTest extends TestCase
                 'user' => ['login' => 'jane'],
                 'title' => 'fix: a bug',
                 'merged_at' => '2024-02-01T00:00:00Z',
+                'merge_commit_sha' => 'fixSha',
                 'base' => ['ref' => 'main'],
             ], [
                 'number' => 1,
                 'user' => ['login' => 'john'],
                 'title' => 'feat: initial',
                 'merged_at' => '2024-01-01T00:00:00Z',
+                'merge_commit_sha' => 'tagsha',
                 'base' => ['ref' => 'main'],
             ]])), // pull requests (descending by date)
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
             ])), // tags
             new Response(200, [], $this->json([
-                'committer' => ['date' => '2024-01-15T00:00:00Z'],
-            ])), // commit date for tag sha
+                'commits' => [['sha' => 'fixSha']],
+            ])), // commits since the tag
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'newTagSha'])), // tag object creation
             new Response(201), // tag reference creation
@@ -443,6 +577,7 @@ class CreateReleaseTest extends TestCase
                 'user' => ['login' => 'alice'],
                 'title' => 'fix: earlier contribution',
                 'merged_at' => '2024-01-10T00:00:00Z',
+                'merge_commit_sha' => 'oldAliceSha',
                 'base' => ['ref' => 'main'],
             ], [
                 // Created before #3 but merged after the previous release.
@@ -450,6 +585,7 @@ class CreateReleaseTest extends TestCase
                 'user' => ['login' => 'alice'],
                 'title' => 'fix: later contribution',
                 'merged_at' => '2024-03-01T00:00:00Z',
+                'merge_commit_sha' => 'newAliceSha',
                 'base' => ['ref' => 'main'],
             ], [
                 // Created first and merged after the previous release.
@@ -457,14 +593,15 @@ class CreateReleaseTest extends TestCase
                 'user' => ['login' => 'bob'],
                 'title' => 'fix: new contribution',
                 'merged_at' => '2024-03-02T00:00:00Z',
+                'merge_commit_sha' => 'bobSha',
                 'base' => ['ref' => 'main'],
             ]])), // pull requests (creation date descending)
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
             ])), // tags
             new Response(200, [], $this->json([
-                'committer' => ['date' => '2024-02-01T00:00:00Z'],
-            ])), // previous release commit
+                'commits' => [['sha' => 'newAliceSha'], ['sha' => 'bobSha']],
+            ])), // commits since the tag
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);

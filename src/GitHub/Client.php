@@ -110,6 +110,35 @@ final class Client
     }
 
     /**
+     * Get commits reachable from head but not from base, following all comparison pages.
+     *
+     * @see https://docs.github.com/en/rest/commits/commits#compare-two-commits
+     *
+     * @return iterable<string>
+     *
+     * @throws RuntimeException
+     */
+    public function getCommitShasBetween(Repository $repository, string $base, string $head): iterable
+    {
+        $url = sprintf('/repos/%s/compare/%s...%s?per_page=100', $repository, rawurlencode($base), rawurlencode($head));
+        while (null !== $url) {
+            [$data, $url] = $this->getJsonAsArray($url);
+            $commits = $data['commits'] ?? null;
+            if (!is_array($commits) || !array_is_list($commits)) {
+                throw new RuntimeException('Missing or invalid "commits" in GitHub comparison response.');
+            }
+
+            foreach ($commits as $commit) {
+                if (!is_array($commit) || !is_string($commit['sha'] ?? null) || '' === $commit['sha']) {
+                    throw new RuntimeException('Missing or invalid commit "sha" in GitHub comparison response.');
+                }
+
+                yield $commit['sha'];
+            }
+        }
+    }
+
+    /**
      * Get the commit timestamp for a given SHA in the specified repository.
      *
      * @see https://docs.github.com/en/rest/git/commits?apiVersion=2026-03-10#get-a-commit-object

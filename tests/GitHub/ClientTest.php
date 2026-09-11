@@ -12,7 +12,10 @@ use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\TestHttpClientTrait;
 use ImboReleaser\Version;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+
+use function array_slice;
 
 use const DATE_RFC2822;
 
@@ -189,6 +192,68 @@ class ClientTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Expected each item from the GitHub API to be an array, got: "string"');
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
+    }
+
+    public function testGetCommitShasBetweenFollowsPagination(): void
+    {
+        $shas = array_map(static fn (int $number): string => 'sha'.$number, range(1, 251));
+        $commits = array_map(static fn (string $sha): array => ['sha' => $sha], $shas);
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, ['Link' => '</comparison?page=2>; rel="next"'], $this->json(['commits' => array_slice($commits, 0, 100)])),
+            new Response(200, ['Link' => '</comparison?page=3>; rel="next"'], $this->json(['commits' => array_slice($commits, 100, 100)])),
+            new Response(200, [], $this->json(['commits' => array_slice($commits, 200)])),
+        );
+
+        $actual = iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'baseSha', 'release/1+2'));
+
+        $this->assertSame($shas, $actual);
+        $this->assertCount(3, $history);
+        $this->assertSame('/repos/owner/repo/compare/baseSha...release%2F1%2B2?per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('/comparison?page=2', (string) $history[1]['request']->getUri());
+        $this->assertSame('/comparison?page=3', (string) $history[2]['request']->getUri());
+    }
+
+    public function testGetCommitShasBetweenWithNoNewCommits(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json(['commits' => []])));
+
+        $this->assertSame([], iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'sameSha', 'sameSha')));
+    }
+
+    /**
+     * @return iterable<string,array{data:array<mixed>}>
+     */
+    public static function invalidComparisonProvider(): iterable
+    {
+        yield 'missing commits' => ['data' => []];
+        yield 'invalid commits' => ['data' => ['commits' => 'invalid']];
+        yield 'non-list commits' => ['data' => ['commits' => ['sha' => 'invalid']]];
+        yield 'invalid commit' => ['data' => ['commits' => [null]]];
+        yield 'missing sha' => ['data' => ['commits' => [[]]]];
+        yield 'invalid sha' => ['data' => ['commits' => [['sha' => 123]]]];
+        yield 'empty sha' => ['data' => ['commits' => [['sha' => '']]]];
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    #[DataProvider('invalidComparisonProvider')]
+    public function testGetCommitShasBetweenRejectsInvalidResponse(array $data): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json($data)));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('GitHub comparison response');
+        iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'baseSha', 'headSha'));
+    }
+
+    public function testGetCommitShasBetweenFailsWhenComparisonIsUnavailable(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(404));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('404 Not Found');
+        iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'baseSha', 'headSha'));
     }
 
     public function testGetShaDateTimeWithServerError(): void
