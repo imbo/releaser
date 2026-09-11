@@ -41,6 +41,24 @@ class RetryTest extends TestCase
     }
 
     /**
+     * @return iterable<string,array{method:string,response:?Response,exception:?ConnectException}>
+     */
+    public static function unsafeRequestProvider(): iterable
+    {
+        yield 'POST with connection error' => ['method' => 'POST', 'response' => null, 'exception' => new ConnectException('Connection refused', new Request('POST', '/repos/owner/repo/releases'))];
+        yield 'POST with rate limit response' => ['method' => 'POST', 'response' => new Response(429), 'exception' => null];
+        yield 'DELETE with server error response' => ['method' => 'DELETE', 'response' => new Response(503), 'exception' => null];
+    }
+
+    #[DataProvider('unsafeRequestProvider')]
+    public function testDoesNotRetryUnsafeRequest(string $method, ?Response $response, ?ConnectException $exception): void
+    {
+        $request = new Request($method, '/repos/owner/repo');
+
+        $this->assertFalse($this->retry->decide(0, $request, $response, $exception));
+    }
+
+    /**
      * @return iterable<string,array{response:Response,shouldRetry:bool}>
      */
     public static function rateLimitProvider(): iterable
