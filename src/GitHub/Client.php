@@ -112,7 +112,7 @@ final class Client
     /**
      * Get commits reachable from head but not from base, following all comparison pages.
      *
-     * @see https://docs.github.com/en/rest/commits/commits#compare-two-commits
+     * @see https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
      *
      * @return iterable<string>
      *
@@ -238,6 +238,8 @@ final class Client
     /**
      * Delete a Git tag reference from the repository.
      *
+     * @see https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#delete-a-reference
+     *
      * @throws RuntimeException
      */
     public function deleteTag(Repository $repository, Version $version): void
@@ -277,7 +279,6 @@ final class Client
         }
 
         $tagData = $this->responseToArray($response);
-
         if (!isset($tagData['sha']) || !is_string($tagData['sha'])) {
             throw new RuntimeException(sprintf('Missing required "sha" key for tag "%s"', $version));
         }
@@ -310,7 +311,6 @@ final class Client
         }
 
         $data = $this->responseToArray($response);
-
         if (!is_array($data['commit'] ?? null) || !is_string($data['commit']['sha'] ?? null)) {
             throw new RuntimeException(sprintf('Missing required "commit.sha" key for branch "%s"', $branch->name));
         }
@@ -382,7 +382,6 @@ final class Client
 
         /** @var list<array<string>> */
         $links = Header::parse($header);
-
         foreach ($links as $link) {
             if (array_key_exists('rel', $link) && 'next' === $link['rel']) {
                 return trim((string) $link[0], '<>');
