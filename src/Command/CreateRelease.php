@@ -291,7 +291,7 @@ class CreateRelease extends BaseCommand
      * Get a list of new contributors.
      *
      * Contributors with a pull request outside this release are excluded. For new contributors,
-     * use their earliest merged pull request in the release.
+     * use their earliest merged pull request in the release and sort by username.
      *
      * @param list<ReleasePullRequest> $pullRequests
      * @param list<ReleasePullRequest> $pullRequestsInRelease
@@ -314,6 +314,8 @@ class CreateRelease extends BaseCommand
                 unset($newContributors[$pullRequest->user->login]);
             }
         }
+
+        ksort($newContributors);
 
         return $newContributors;
     }
@@ -497,6 +499,7 @@ class CreateRelease extends BaseCommand
             }
 
             $process = Process::fromShellCommandline($editor.' '.escapeshellarg($tmpFile));
+            $process->setTimeout(null);
             $process->setTty(true);
 
             try {
