@@ -13,7 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: composer install --no-dev
-      - run: scripts/conventional-commit-msg.php "${{ github.event.pull_request.title }}"
+      - run: scripts/conventional-commit-msg.php "$PR_TITLE"
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
   tests-and-qa:
     name: composer run ${{ matrix.composer-script }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
