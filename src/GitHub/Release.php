@@ -8,6 +8,7 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Version;
 use Stringable;
 
+use function array_key_exists;
 use function is_string;
 use function sprintf;
 use function var_export;
@@ -42,9 +43,12 @@ final class Release implements Stringable
      */
     public static function fromAPI(array $data): self
     {
-        $name = $data['name'] ?? null;
-        if (!is_string($name)) {
+        if (!array_key_exists('name', $data)) {
             throw new InvalidArgumentException(sprintf('Missing required "name" key: %s', var_export($data, true)));
+        }
+        $name = $data['name'];
+        if (null !== $name && !is_string($name)) {
+            throw new InvalidArgumentException(sprintf('Invalid "name" value: %s', var_export($data, true)));
         }
 
         $tagName = $data['tag_name'] ?? null;
@@ -68,6 +72,6 @@ final class Release implements Stringable
             throw new InvalidArgumentException(sprintf('Invalid "created_at" value: %s', $createdAt), previous: $e);
         }
 
-        return new self($name, $tagName, $htmlUrl, $createdAtDateTime);
+        return new self($name ?? $tagName, $tagName, $htmlUrl, $createdAtDateTime);
     }
 }

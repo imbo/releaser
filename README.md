@@ -44,7 +44,7 @@ Release tags must end in a semantic version such as `1.2.3` or `v1.2.3`; other G
 
 Once installed you can see the available commands and documentation by running the `imbo-releaser` script.
 
-The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. When these are not provided, they are resolved from your [configuration](#configuration) or, in interactive mode, prompted for. Run any command with `--help` to see all available options and arguments.
+The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. If you omit `--config`, the application looks for a configuration file in the [locations described below](#where-the-configuration-is-loaded-from). If you omit `--repository`, it uses the repository from your configuration or asks you to enter one when running interactively. Run any command with `--help` to see all available options and arguments.
 
 For non-interactive environments such as CI, pass `--no-interaction` (or `-n`) and provide every value that would otherwise be prompted for. For example:
 
@@ -60,7 +60,7 @@ imbo-releaser create --help
 
 This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created.
 
-When a previous tag exists, pull requests are included by matching their merge commit SHAs against the commits added since that tag. Merge and commit timestamps are not used to decide release membership, so differences between those timestamps cannot cause a previously released pull request to be included again. Pull requests without a merge commit SHA are skipped when calculating this range and do not affect the release notes or version bump.
+When a previous tag exists, the application checks which pull requests added commits since that tag. It uses commit identifiers rather than dates, so differences between a commit's date and the time its pull request was merged do not cause already released changes to be included again. If GitHub does not provide the resulting commit's identifier for a pull request, that pull request is skipped and affects neither the release notes nor the next version.
 
 Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
 
@@ -107,7 +107,9 @@ imbo-releaser create --repository owner/repo --branch main --name "Version 1.3"
 imbo-releaser list --help
 ```
 
-This command prints a table of the existing releases in the repository, including the release name, tag name, and release date.
+This command prints a table of the existing releases in the repository, including the release name, tag name, and release date, with the newest releases first.
+
+Releases without a name are displayed using their tag name.
 
 ### Delete a release
 
@@ -119,7 +121,7 @@ This command deletes a GitHub release and its associated Git tag. If no version 
 
 Pass `-d` or `--dry-run` with a version to preview the deletion without deleting the GitHub release or tag.
 
-Deleting a release and its tag is not atomic. If the release is deleted but the tag deletion fails, delete the remaining tag with:
+The GitHub release and its tag are deleted in separate steps. If the release is deleted but deleting the tag fails, remove the remaining tag with:
 
 ```bash
 imbo-releaser delete --tag-only 1.2.3
@@ -176,17 +178,17 @@ By default, pull requests authored by `dependabot[bot]` and pull requests labell
 
 ### Where the configuration is loaded from
 
-You can point to an explicit config file with the `--config` / `-c` option. Otherwise the configuration is resolved from the following locations, in order, and the first match wins:
+You can choose a configuration file with the `--config` / `-c` option. Otherwise the application checks the following locations in order and uses the first configuration file it finds:
 
 1. `.imbo-releaser.php` in the current working directory
 2. `.imbo-releaser.dist.php` in the current working directory
 3. `config.php` in your config home (`$XDG_CONFIG_HOME/imbo-releaser/config.php`, falling back to `~/.config/imbo-releaser/config.php`)
 
-Only the first file found is used; the files are not merged. This lets you keep a personal config in your config home as a fallback for repositories that don't ship their own, while a project-specific file in the working directory takes full precedence when present. If none of these files exist, the built-in defaults are used.
+Only the first file found is used; settings from different files are not combined. You can keep a personal configuration in your user configuration directory for projects that don't provide their own. A configuration file in the working directory is used instead when present. If none of these files exist, the built-in defaults are used.
 
 ## Authentication
 
-Imbo Releaser requires a GitHub API token to interact with the GitHub API. The token is resolved in the following order:
+Imbo Releaser requires a GitHub API token to interact with the GitHub API. It looks for a token in the following places, in order:
 
 1. The `GITHUB_TOKEN` environment variable (also loaded from a `.env` file in the current directory if present)
 2. The output of `gh auth token` (requires the [GitHub CLI](https://cli.github.com/) to be installed and authenticated)
@@ -195,7 +197,7 @@ If neither source provides a token, the application will exit with an error.
 
 ## Release notes templates
 
-Release notes are generated using [Twig](https://twig.symfony.com/) templates. The built-in default template produces output grouped by Conventional Commit type with contributor attribution.
+Release notes are generated using [Twig](https://twig.symfony.com/) templates. The default template groups changes by Conventional Commit type and credits the contributors.
 
 To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create` command.
 
@@ -210,7 +212,7 @@ The following variables are available in all templates:
 | `pullRequests`        | `list<ReleasePullRequest>`               | All filtered pull requests included in this release                                                                                     |
 | `groupedPullRequests` | `array<string,list<ReleasePullRequest>>` | Pull requests grouped by their Conventional Commit type label, as defined by `pullRequestGroups()` and `fallbackGroup()` in your config |
 | `newContributors`     | `array<string,ReleasePullRequest>`       | Map of username to their first pull request, for contributors making their first contribution in this release                           |
-| `releaserVersion`     | `?string`                                | Installed Imbo Releaser version, or `null` when Composer metadata is unavailable                                                        |
+| `releaserVersion`     | `?string`                                | Installed Imbo Releaser version, if available                                                                                           |
 
 ## Version calculation
 
