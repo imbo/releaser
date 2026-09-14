@@ -2,7 +2,6 @@
 
 namespace ImboReleaser\Command;
 
-use DateTimeImmutable;
 use ImboReleaser\Console\ProgressIndicator;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\ReleaseCreationException;
@@ -196,15 +195,14 @@ class CreateRelease extends BaseCommand
         $allTags = $this->getTags($repository, $output);
         $tags = array_values(array_filter($allTags, $this->config->filterTag(...)));
         $tag = $this->config->getLatestTagForBranch($branch, $tags);
-        $since = null;
         if (null === $tag) {
             $nextVersion = $this->config->initialVersion();
             $pullRequestsInRelease = $pullRequests;
         } else {
-            $since = $this->gitHubClient->getShaDateTime($repository, $tag->sha);
+            $commitShas = array_fill_keys(iterator_to_array($this->gitHubClient->getCommitShasBetween($repository, $tag->sha, $branch->name)), true);
             $pullRequestsInRelease = [];
             foreach ($pullRequests as $pullRequest) {
-                if ($pullRequest->mergedAt <= $since) {
+                if (null === $pullRequest->mergeCommitSha || !isset($commitShas[$pullRequest->mergeCommitSha])) {
                     continue;
                 }
 
@@ -235,7 +233,7 @@ class CreateRelease extends BaseCommand
             $repository,
             $pullRequestsInRelease,
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),
-            $this->getNewContributors($pullRequests, $since),
+            $this->getNewContributors($pullRequests, $pullRequestsInRelease),
             $this->getApplication()?->getVersion(),
         ));
 
@@ -292,25 +290,29 @@ class CreateRelease extends BaseCommand
     /**
      * Get a list of new contributors.
      *
-     * The pull requests are ordered by merged date in descending order, so if a contributor has
-     * multiple pull requests, only the first one will be included in the list of new contributors.
+     * Contributors with a pull request outside this release are excluded. For new contributors,
+     * use their earliest merged pull request in the release.
      *
      * @param list<ReleasePullRequest> $pullRequests
+     * @param list<ReleasePullRequest> $pullRequestsInRelease
      *
      * @return array<string,ReleasePullRequest> an associative array where the keys are the GitHub usernames of the new contributors and the values are the first pull request merged by the contributor
      */
-    private function getNewContributors(array $pullRequests, ?DateTimeImmutable $since): array
+    private function getNewContributors(array $pullRequests, array $pullRequestsInRelease): array
     {
-        usort($pullRequests, static fn (ReleasePullRequest $a, ReleasePullRequest $b): int => $b->mergedAt <=> $a->mergedAt);
+        usort($pullRequestsInRelease, static fn (ReleasePullRequest $a, ReleasePullRequest $b): int => $b->mergedAt <=> $a->mergedAt);
 
+        $releaseNumbers = [];
         $newContributors = [];
-        foreach ($pullRequests as $pullRequest) {
-            if (null !== $since && $pullRequest->mergedAt <= $since) {
-                unset($newContributors[$pullRequest->user->login]);
-                continue;
-            }
-
+        foreach ($pullRequestsInRelease as $pullRequest) {
+            $releaseNumbers[$pullRequest->number] = true;
             $newContributors[$pullRequest->user->login] = $pullRequest;
+        }
+
+        foreach ($pullRequests as $pullRequest) {
+            if (!isset($releaseNumbers[$pullRequest->number])) {
+                unset($newContributors[$pullRequest->user->login]);
+            }
         }
 
         return $newContributors;

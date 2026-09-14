@@ -21,6 +21,7 @@ final class PullRequest
         public readonly string $baseRef,
         /** @var list<string> */
         public readonly array $labels = [],
+        public readonly ?string $mergeCommitSha = null,
     ) {
     }
 
@@ -83,6 +84,11 @@ final class PullRequest
         $labels = $data['labels'] ?? [];
         $labels = array_map(static fn (array $label): string => $label['name'], $labels);
 
-        return new self($number, new User($login), $mergedAtDateTime, $message, $ref, $labels);
+        $mergeCommitSha = $data['merge_commit_sha'] ?? null;
+        if (null !== $mergeCommitSha && (!is_string($mergeCommitSha) || '' === $mergeCommitSha)) {
+            throw new InvalidArgumentException(sprintf('Invalid "merge_commit_sha" for pull request #%d', $number));
+        }
+
+        return new self($number, new User($login), $mergedAtDateTime, $message, $ref, $labels, $mergeCommitSha);
     }
 }
