@@ -66,6 +66,8 @@ Pass `--name` to set the GitHub release name; otherwise the calculated version i
 
 Pass `--prerelease <identifier>` to create a prerelease, for example `--prerelease rc` creates `v1.2.3-rc.1`. Repeating the command with the same identifier increments the prerelease number, such as `v1.2.3-rc.2`. Run the command without `--prerelease` to create the stable release; prerelease tags do not affect stable version calculation.
 
+As required by [Semantic Versioning](https://semver.org/spec/v2.0.0.html#spec-item-9), prerelease identifiers made entirely of digits cannot have leading zeros. For example, `0` and `1` are allowed, but `01` is not. Identifiers containing letters or hyphens, such as `rc` or `01alpha`, are also allowed.
+
 Pass `--dry-run` to preview the calculated release and release notes without creating a tag or release.
 
 ### Example release workflow

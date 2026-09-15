@@ -56,11 +56,13 @@ final class Version implements Stringable
     /**
      * Create a prerelease version using the given identifier and sequence number.
      *
+     * @see https://semver.org/spec/v2.0.0.html#spec-item-9
+     *
      * @throws InvalidArgumentException
      */
     public function withPrerelease(string $identifier, int $number): self
     {
-        if (!preg_match('/^[0-9A-Za-z-]+$/', $identifier) || $number < 1) {
+        if (!preg_match('/^(?!0[0-9]+$)[0-9A-Za-z-]+$/D', $identifier) || $number < 1) {
             throw new InvalidArgumentException(sprintf('Invalid prerelease identifier or number: "%s.%d"', $identifier, $number));
         }
 
@@ -74,7 +76,7 @@ final class Version implements Stringable
 
     public function prereleaseNumber(string $identifier): ?int
     {
-        if (!preg_match('/^'.preg_quote($identifier, '/').'\.(\d+)$/', $this->prerelease ?? '', $matches)) {
+        if (!preg_match('/^'.preg_quote($identifier, '/').'\.(\d+)$/D', $this->prerelease ?? '', $matches)) {
             return null;
         }
 
@@ -82,13 +84,18 @@ final class Version implements Stringable
     }
 
     /**
-     * Parse a semantic version with an optional arbitrary prefix.
+     * Parse a semantic version with an optional prefix containing no whitespace.
      *
      * @throws InvalidArgumentException
      */
     public static function fromString(string $version): self
     {
-        if (!preg_match('/^(?P<prefix>.*?\D)?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/', $version, $matches)) {
+        if (!preg_match('/^(?P<prefix>\S*?[^\d\s])?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/D', $version, $matches)) {
+            throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
+        }
+
+        // SemVer forbids leading zeros in every purely numeric prerelease identifier.
+        if (preg_match('/(?:^|\.)0[0-9]+(?:\.|$)/D', $matches['prerelease'] ?? '')) {
             throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
         }
 

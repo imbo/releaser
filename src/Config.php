@@ -33,7 +33,7 @@ class Config implements ConfigInterface
     {
         return
             in_array($branch->name, $this->mainBranchNames(), true)
-            || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/', $branch->name);
+            || 1 === preg_match('/^v?\d+(\.\d+)?(\.x)?$/D', $branch->name);
     }
 
     public function filterTag(ReleaseTag $tag): bool

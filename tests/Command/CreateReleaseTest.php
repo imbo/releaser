@@ -171,6 +171,32 @@ class CreateReleaseTest extends TestCase
         $this->assertTrue($data['prerelease']);
     }
 
+    public function testRejectsPrereleaseWithLeadingZero(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'alice'],
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'title' => 'feat: a feature',
+                'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([])),
+        );
+        $commandTester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid prerelease identifier or number: "01.1"');
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--prerelease' => '01'], ['interactive' => false]);
+        } finally {
+            $this->assertCount(2, $history);
+            foreach ($history as $transaction) {
+                $this->assertSame('GET', $transaction['request']->getMethod());
+            }
+        }
+    }
+
     public function testSelectValidRepositoryAndBranch(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
