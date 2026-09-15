@@ -42,6 +42,8 @@ The key points regarding how Imbo Releaser works out of the box are as follows:
 
 Release tags must end in a semantic version such as `1.2.3` or `v1.2.3`; other Git tags are ignored. Other tag prefixes are supported. Override `filterTag()` to exclude release tags and, when using maintenance branches, override `getLatestTagForBranch()` to define how the prefix maps to a branch.
 
+If reading from GitHub fails because of a connection problem, temporary server error, or rate limit, Imbo Releaser retries up to three times. It waits as instructed by GitHub, up to one minute. If GitHub requires a longer wait, the command fails so you can try again later.
+
 Once installed you can see the available commands and documentation by running the `imbo-releaser` script.
 
 The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. If you omit `--config`, the application looks for a configuration file in the [locations described below](#where-the-configuration-is-loaded-from). If you omit `--repository`, it uses the repository from your configuration or asks you to enter one when running interactively. Run any command with `--help` to see all available options and arguments.
