@@ -39,6 +39,15 @@ class TokenResolver
      */
     public function getGitHubToken(): ?string
     {
+        // Depending on variables_order, $_SERVER and $_ENV may omit environment variables,
+        // so fall back to getenv() when the token is missing from both.
+        if (!isset($_SERVER['GITHUB_TOKEN']) && !isset($_ENV['GITHUB_TOKEN'])) {
+            $token = getenv('GITHUB_TOKEN');
+            if (false !== $token) {
+                $_ENV['GITHUB_TOKEN'] = $token;
+            }
+        }
+
         if (null !== $this->cwd) {
             $envFile = $this->cwd.'/.env';
             if (is_file($envFile)) {

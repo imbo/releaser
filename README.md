@@ -198,7 +198,7 @@ Only the first file found is used; settings from different files are not combine
 
 Imbo Releaser requires a GitHub API token to interact with the GitHub API. It looks for a token in the following places, in order:
 
-1. The `GITHUB_TOKEN` environment variable (also loaded from a `.env` file in the current directory if present)
+1. The `GITHUB_TOKEN` environment variable (also loaded from a `.env` file in the current directory if present; externally provided values take precedence)
 2. The output of `gh auth token` (requires the [GitHub CLI](https://cli.github.com/) to be installed and authenticated)
 
 If neither source provides a token, the application will exit with an error.
