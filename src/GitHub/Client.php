@@ -97,7 +97,7 @@ final class Client
             sprintf(
                 '/repos/%s/pulls?state=closed&sort=created&direction=desc&base=%s&per_page=100',
                 $repository,
-                $branch->name,
+                rawurlencode($branch->name),
             ),
             PullRequest::fromAPI(...),
             static function (array $item): bool {
@@ -305,7 +305,7 @@ final class Client
     private function getBranchSha(Repository $repository, Branch $branch): string
     {
         try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, $branch->name));
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, rawurlencode($branch->name)));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
         }

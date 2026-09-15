@@ -110,7 +110,18 @@ class ClientTest extends TestCase
         $this->assertSame('/repos/owner/repo/tags?per_page=100', (string) $history[0]['request']->getUri());
     }
 
-    public function testGetPullRequests(): void
+    /**
+     * @return iterable<string,array{branchName:string,encodedName:string}>
+     */
+    public static function branchNameProvider(): iterable
+    {
+        yield 'main' => ['branchName' => 'main', 'encodedName' => 'main'];
+        yield 'slash' => ['branchName' => 'release/1.x', 'encodedName' => 'release%2F1.x'];
+        yield 'reserved characters' => ['branchName' => 'release/1+2&x=3#4%5', 'encodedName' => 'release%2F1%2B2%26x%3D3%234%255'];
+    }
+
+    #[DataProvider('branchNameProvider')]
+    public function testGetPullRequests(string $branchName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
@@ -129,14 +140,16 @@ class ClientTest extends TestCase
         );
 
         $client = new Client($guzzleClient);
-        $pullRequests = iterator_to_array($client->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
+        $pullRequests = iterator_to_array($client->getMergedPullRequests(new Branch($branchName), new Repository('owner', 'repo')));
 
         $this->assertCount(2, $pullRequests);
         $this->assertSame(4, $pullRequests[0]->number);
         $this->assertSame(2, $pullRequests[1]->number);
 
         $this->assertCount(1, $history);
-        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&base=main&per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&base='.$encodedName.'&per_page=100', (string) $history[0]['request']->getUri());
+        parse_str($history[0]['request']->getUri()->getQuery(), $query);
+        $this->assertSame($branchName, $query['base']);
     }
 
     public function testFetchPaginatedWithErrorResponse(): void
@@ -397,7 +410,8 @@ class ClientTest extends TestCase
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'some message');
     }
 
-    public function testCreateRelease(): void
+    #[DataProvider('branchNameProvider')]
+    public function testCreateRelease(string $branchName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
@@ -411,10 +425,10 @@ class ClientTest extends TestCase
             ])),
         );
 
-        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0', true, true);
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch($branchName), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0', true, true);
 
         $this->assertCount(4, $history);
-        $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/branches/'.$encodedName, (string) $history[0]['request']->getUri());
         $this->assertSame('GET', $history[0]['request']->getMethod());
 
         $this->assertSame('/repos/owner/repo/git/tags', (string) $history[1]['request']->getUri());
