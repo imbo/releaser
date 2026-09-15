@@ -191,7 +191,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
-                ['name' => 'Release 2.0.0', 'tag_name' => '2.0.0', 'html_url' => 'url', 'created_at' => '2026-01-02T00:00:00Z'],
+                ['name' => null, 'tag_name' => '2.0.0', 'html_url' => 'url', 'created_at' => '2026-01-02T00:00:00Z'],
             ])),
             new Response(200, [], $this->json(['id' => 99, 'tag_name' => '2.0.0'])),
             new Response(204), // Delete release

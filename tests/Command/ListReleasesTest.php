@@ -71,6 +71,7 @@ class ListReleasesTest extends TestCase
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
+                ['name' => null, 'tag_name' => '1.2.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.2.0', 'created_at' => '2026-01-03T00:00:00Z'],
                 ['name' => 'Release 1.1.0', 'tag_name' => '1.1.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.1.0', 'created_at' => '2026-01-02T00:00:00Z'],
             ])),
         );
@@ -84,8 +85,10 @@ class ListReleasesTest extends TestCase
         $this->assertStringContainsString('1.0.0', $display);
         $this->assertStringContainsString('Release 1.1.0', $display);
         $this->assertStringContainsString('1.1.0', $display);
+        $this->assertMatchesRegularExpression('/\| 1\.2\.0\s+\| 1\.2\.0\s+\|/', $display);
         $this->assertStringContainsString('2026-01-01', $display);
         $this->assertStringContainsString('2026-01-02', $display);
+        $this->assertMatchesRegularExpression('/2026-01-03.*2026-01-02.*2026-01-01/s', $display);
         $this->assertStringNotContainsString('Fetching releases...', $display);
         $this->assertStringNotContainsString('Fetched releases', $display);
 

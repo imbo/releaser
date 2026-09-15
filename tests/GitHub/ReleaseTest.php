@@ -25,6 +25,10 @@ class ReleaseTest extends TestCase
             ],
             'error' => 'Missing required "name" key',
         ];
+        yield 'invalid name' => [
+            'data' => ['name' => 123],
+            'error' => 'Invalid "name" value',
+        ];
         yield 'missing tag_name' => [
             'data' => [
                 'name' => 'release name',
@@ -73,6 +77,20 @@ class ReleaseTest extends TestCase
         $url = 'https://github.com/owner/repo/releases/tag/v1.0.0';
         $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.1.1', 'html_url' => $url, 'created_at' => '2024-01-01T00:00:00Z']);
         $this->assertSame($url, $release->htmlUrl);
+        $this->assertSame('release name', $release->name);
+    }
+
+    public function testFromAPIWithNullName(): void
+    {
+        $release = Release::fromAPI([
+            'name' => null,
+            'tag_name' => 'v1.2.3',
+            'html_url' => 'https://github.com/owner/repo/releases/tag/v1.2.3',
+            'created_at' => '2024-01-01T00:00:00Z',
+        ]);
+
+        $this->assertSame('v1.2.3', $release->name);
+        $this->assertSame('v1.2.3', $release->tagName);
     }
 
     public function testFromAPIWithValidVersion(): void

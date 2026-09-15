@@ -77,6 +77,8 @@ class ListReleases extends BaseCommand
 
         $progress->finish('Fetched releases');
 
+        usort($releases, static fn (Release $a, Release $b): int => $b->createdAt <=> $a->createdAt);
+
         return $releases;
     }
 }
