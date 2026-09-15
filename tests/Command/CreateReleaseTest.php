@@ -75,7 +75,7 @@ class CreateReleaseTest extends TestCase
                 'number' => 123,
                 'user' => ['login' => 'johndoe'],
                 'merged_at' => '2024-01-01T00:00:00Z',
-                'title' => 'feat: add new feature',
+                'title' => 'feat: support `Map<K, V>` & "quoted values"',
                 'base' => ['ref' => 'main'],
             ]])), // pull requests
             new Response(200, [], $this->json([
@@ -120,7 +120,7 @@ class CreateReleaseTest extends TestCase
 
         $releaseNotes = <<<RELEASE_NOTES
         ## New Features 🚀
-        * feat: add new feature by @johndoe in https://github.com/owner/repo/pull/123
+        * feat: support `Map<K, V>` & "quoted values" by @johndoe in https://github.com/owner/repo/pull/123
 
         ## New Contributors
         * @johndoe made their first contribution in https://github.com/owner/repo/pull/123
