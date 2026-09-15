@@ -469,7 +469,7 @@ class CreateRelease extends BaseCommand
      */
     private function generateReleaseNotes(string $template, TemplateData $data): string
     {
-        $twig = new Environment(new FilesystemLoader(dirname($template)));
+        $twig = new Environment(new FilesystemLoader(dirname($template)), ['autoescape' => false]);
 
         try {
             return $twig->render(basename($template), $data->toContext());

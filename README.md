@@ -201,6 +201,8 @@ Release notes are generated using [Twig](https://twig.symfony.com/) templates. T
 
 To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create` command.
 
+Templates produce Markdown, so characters such as `<`, `>`, and `&` are preserved rather than converted to HTML entities. This keeps code examples and links intact.
+
 ### Available template variables
 
 The following variables are available in all templates:
