@@ -49,6 +49,13 @@ class VersionTest extends TestCase
         $this->assertSame('1.3.0', (string) (new Version(null, 1, 2, 3))->incrementMinor());
     }
 
+    public function testPrereleaseNumberRejectsTrailingNewline(): void
+    {
+        $version = new Version('v', 1, 2, 3, "rc.1\n");
+
+        $this->assertNull($version->prereleaseNumber('rc'));
+    }
+
     public function testIncrementClearsPrerelease(): void
     {
         $version = Version::fromString('v1.2.3-rc.1');
@@ -75,7 +82,29 @@ class VersionTest extends TestCase
     {
         yield 'empty identifier' => ['identifier' => '', 'number' => 1];
         yield 'invalid identifier character' => ['identifier' => 'rc_1', 'number' => 1];
+        yield 'trailing newline' => ['identifier' => "rc\n", 'number' => 1];
         yield 'zero sequence number' => ['identifier' => 'rc', 'number' => 0];
+        yield 'leading zero identifier' => ['identifier' => '01', 'number' => 1];
+        yield 'multiple zero identifier' => ['identifier' => '00', 'number' => 1];
+    }
+
+    /**
+     * @return iterable<string,array{identifier:string}>
+     */
+    public static function validPrereleaseIdentifierProvider(): iterable
+    {
+        foreach (['0', '1', '10', 'rc', '01alpha', '01-'] as $identifier) {
+            yield $identifier => ['identifier' => $identifier];
+        }
+    }
+
+    #[DataProvider('validPrereleaseIdentifierProvider')]
+    public function testAcceptsValidPrereleaseIdentifier(string $identifier): void
+    {
+        $version = (new Version('v', 1, 2, 3))->withPrerelease($identifier, 1);
+
+        $this->assertSame('v1.2.3-'.$identifier.'.1', (string) $version);
+        $this->assertSame((string) $version, (string) Version::fromString((string) $version));
     }
 
     #[DataProvider('invalidPrereleaseProvider')]
@@ -158,6 +187,14 @@ class VersionTest extends TestCase
             'input' => 'v1.2.3-0',
             'expected' => 'v1.2.3-0',
         ];
+        yield 'zero sequence' => [
+            'input' => 'v1.2.3-rc.0',
+            'expected' => 'v1.2.3-rc.0',
+        ];
+        yield 'alphanumeric sequence' => [
+            'input' => 'v1.2.3-rc.01alpha',
+            'expected' => 'v1.2.3-rc.01alpha',
+        ];
     }
 
     #[DataProvider('fromStringProvider')]
@@ -181,6 +218,19 @@ class VersionTest extends TestCase
         yield 'leading zero patch' => ['input' => '1.2.03'];
         yield 'empty prerelease' => ['input' => 'v1.2.3-'];
         yield 'invalid prerelease' => ['input' => 'v1.2.3-rc_1'];
+        yield 'leading zero prerelease' => ['input' => 'v1.2.3-01'];
+        yield 'leading zero sequence' => ['input' => 'v1.2.3-rc.01'];
+        yield 'leading zero middle identifier' => ['input' => 'v1.2.3-rc.01.alpha'];
+        yield 'multiple zeros' => ['input' => 'v1.2.3-00.1'];
+        yield 'custom prefix leading zero' => ['input' => 'release-1.2.3-01.1'];
+        yield 'trailing newline' => ['input' => "v1.2.3\n"];
+        yield 'prerelease trailing newline' => ['input' => "v1.2.3-rc.1\n"];
+        yield 'leading newline' => ['input' => "\n1.2.3"];
+        yield 'newline in prefix' => ['input' => "release\n1.2.3"];
+        yield 'carriage return in prefix' => ['input' => "release\r1.2.3"];
+        yield 'tab in prefix' => ['input' => "release\t1.2.3"];
+        yield 'space in prefix' => ['input' => 'release 1.2.3'];
+        yield 'whitespace inside prefix' => ['input' => 'release candidate-1.2.3'];
     }
 
     #[DataProvider('invalidVersionStringProvider')]

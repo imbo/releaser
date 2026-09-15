@@ -34,6 +34,7 @@ class RepositoryTest extends TestCase
         yield 'owner contains whitespace' => ['repository' => 'owner name/repo'];
         yield 'repository contains whitespace' => ['repository' => 'owner/repo name'];
         yield 'additional path segment' => ['repository' => 'owner/repo/path'];
+        yield 'trailing newline' => ['repository' => "owner/repo\n"];
     }
 
     #[DataProvider('invalidRepositoryProvider')]

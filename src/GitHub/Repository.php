@@ -39,6 +39,6 @@ final class Repository implements Stringable
 
     public static function isValid(string $repository): bool
     {
-        return 1 === preg_match('#^[^\s/]+/[^\s/]+$#', $repository);
+        return 1 === preg_match('#^[^\s/]+/[^\s/]+$#D', $repository);
     }
 }

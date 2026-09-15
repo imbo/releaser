@@ -89,6 +89,7 @@ class ConfigTest extends TestCase
         yield 'dev' => ['branchName' => 'dev', 'valid' => false];
         yield 'develop' => ['branchName' => 'develop', 'valid' => false];
         yield 'feature-branch' => ['branchName' => 'feature-branch', 'valid' => false];
+        yield 'trailing newline' => ['branchName' => "1.x\n", 'valid' => false];
     }
 
     #[DataProvider('filterBranchProvider')]
