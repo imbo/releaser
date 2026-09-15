@@ -177,7 +177,7 @@ class CreateRelease extends BaseCommand
         /** @var ?string */
         $branchName = $input->getOption('branch');
         if (null === $branchName) {
-            throw new InvalidArgumentException('Specify a branch using the -b|--branch option or override the getBranch method in your config.');
+            throw new InvalidArgumentException('Specify a branch using the -b|--branch option or override the getBranch method in your config.', self::INVALID);
         }
         $branch = new Branch($branchName);
 
