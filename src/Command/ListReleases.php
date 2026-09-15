@@ -12,6 +12,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 use function sprintf;
+use function strcmp;
 
 #[AsCommand(
     name: ListReleases::NAME,
@@ -48,7 +49,7 @@ class ListReleases extends BaseCommand
                 static fn (Release $release): array => [
                     sprintf('<href=%s>%s</>', $release->htmlUrl, $release->name),
                     $release->tagName,
-                    $release->createdAt->format('Y-m-d H:i:s'),
+                    $release->draft ? 'Draft' : ($release->publishedAt?->format('Y-m-d H:i:s') ?? 'Unknown'),
                 ],
                 $releases,
             ))
@@ -77,7 +78,9 @@ class ListReleases extends BaseCommand
 
         $progress->finish('Fetched releases');
 
-        usort($releases, static fn (Release $a, Release $b): int => $b->createdAt <=> $a->createdAt);
+        usort($releases, static fn (Release $a, Release $b): int => ($a->draft <=> $b->draft)
+            ?: ($a->draft ? 0 : ($b->publishedAt <=> $a->publishedAt))
+            ?: strcmp($a->tagName, $b->tagName));
 
         return $releases;
     }
