@@ -50,8 +50,8 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient();
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Specify the version to delete when running non-interactively or using --tag-only.');
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Specify the version to delete when running non-interactively or using --tag-only or --dry-run.');
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
     }
 

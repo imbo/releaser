@@ -142,7 +142,7 @@ class DeleteRelease extends BaseCommand
         /** @var ?string */
         $versionArg = $input->getArgument('version');
         if (null === $versionArg) {
-            throw new RuntimeException('Specify the version to delete when running non-interactively or using --tag-only.');
+            throw new InvalidArgumentException('Specify the version to delete when running non-interactively or using --tag-only or --dry-run.', self::INVALID);
         }
 
         try {

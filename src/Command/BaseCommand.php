@@ -156,7 +156,7 @@ abstract class BaseCommand extends Command
         /** @var ?string */
         $name = $input->getOption('repository');
         if (null === $name) {
-            throw new InvalidArgumentException('Specify a GitHub repository using the -r|--repository option or override the getGitHubRepository method in your config.');
+            throw new InvalidArgumentException('Specify a GitHub repository using the -r|--repository option or override the getGitHubRepository method in your config.', self::INVALID);
         }
 
         return Repository::fromString($name);
