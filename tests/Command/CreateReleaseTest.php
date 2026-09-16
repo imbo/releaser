@@ -44,9 +44,9 @@ class CreateReleaseTest extends TestCase
             ];
         }
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json($prs)),
-            new Response(200, [], $this->json([['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']]])),
-            new Response(200, [], $this->json(['commits' => [['sha' => 'merge0'], ['sha' => 'merge1'], ['sha' => 'merge2'], ['sha' => 'merge3']]])),
+            new Response(200, [], $this->json($prs)), // pull requests
+            new Response(200, [], $this->json([['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']]])), // tags
+            new Response(200, [], $this->json(['commits' => [['sha' => 'merge0'], ['sha' => 'merge1'], ['sha' => 'merge2'], ['sha' => 'merge3']]])), // commits since the tag
         );
         $tester = new CommandTester($this->createCommand($guzzleClient, $config));
         $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
@@ -58,6 +58,90 @@ class CreateReleaseTest extends TestCase
         $this->assertMatchesRegularExpression('/## Bug Fixes[^#]*uppercase fix/s', $display);
         $this->assertMatchesRegularExpression('/## Custom Changes[^#]*custom change/s', $display);
         $this->assertStringNotContainsString('Other Changes', $display);
+    }
+
+    public function testReleaseNotesIncludeBreakingChangesAndScopes(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([
+                [
+                    'number' => 1, 'user' => ['login' => 'alice'],
+                    'title' => 'feat(API)!: replace the client',
+                    'body' => <<<BODY
+                    BREAKING CHANGE: Use `NewClient<T>` instead.
+                    Update the configuration.
+
+                    BREAKING-CHANGE: Rename the environment variable.
+
+                    Refs: #42
+                    BODY,
+                    'merged_at' => '2024-01-01T00:00:00Z', 'base' => ['ref' => 'main'],
+                ],
+                [
+                    'number' => 2, 'user' => ['login' => 'bob'],
+                    'title' => 'fix: remove the old option',
+                    'body' => 'BREAKING-CHANGE: Use the replacement option.',
+                    'merged_at' => '2024-01-02T00:00:00Z', 'base' => ['ref' => 'main'],
+                ],
+                [
+                    'number' => 3, 'user' => ['login' => 'bob'],
+                    'title' => 'fix!: remove deprecated behavior',
+                    'merged_at' => '2024-01-03T00:00:00Z', 'base' => ['ref' => 'main'],
+                ],
+                [
+                    'number' => 4, 'user' => ['login' => 'bob'],
+                    'title' => 'fix(cache): correct expiry',
+                    'merged_at' => '2024-01-04T00:00:00Z', 'base' => ['ref' => 'main'],
+                ],
+            ])), // pull requests
+            new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
+            new Response(201), // tag reference creation
+            new Response(201, [], $this->json([
+                'name' => 'v0.1.0', 'tag_name' => 'v0.1.0',
+                'html_url' => 'url', 'created_at' => '2024-01-05T00:00:00Z',
+            ])), // release creation
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        /** @var array{message:string} $tag */
+        $tag = json_decode((string) $history[3]['request']->getBody(), true);
+        /** @var array{body:string} $release */
+        $release = json_decode((string) $history[5]['request']->getBody(), true);
+        $releaseNotes = <<<RELEASE_NOTES
+        ## New Features 🚀
+        * feat(API)!: replace the client by @alice in https://github.com/owner/repo/pull/1
+
+          **BREAKING CHANGE:** Use `NewClient<T>` instead.
+          Update the configuration.
+
+
+          **BREAKING CHANGE:** Rename the environment variable.
+
+
+        ## Bug Fixes 🐛
+        * fix!: remove the old option by @bob in https://github.com/owner/repo/pull/2
+
+          **BREAKING CHANGE:** Use the replacement option.
+
+        * fix!: remove deprecated behavior by @bob in https://github.com/owner/repo/pull/3
+        * fix(cache): correct expiry by @bob in https://github.com/owner/repo/pull/4
+
+        ## New Contributors
+        * @alice made their first contribution in https://github.com/owner/repo/pull/1
+        * @bob made their first contribution in https://github.com/owner/repo/pull/2
+
+        **Full Changelog**: https://github.com/owner/repo/commits/v0.1.0
+
+        <!-- Release generated by Imbo Releaser: https://github.com/imbo/releaser -->
+
+        RELEASE_NOTES;
+
+        $this->assertSame($releaseNotes, $tag['message']);
+        $this->assertSame($releaseNotes, $release['body']);
     }
 
     public function testMissingBranch(): void
@@ -76,7 +160,7 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json([
                 ['name' => 'main'],
                 ['name' => 'v1.x'],
-            ])),
+            ])), // branches
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -91,7 +175,7 @@ class CreateReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'develop'],
-            ])),
+            ])), // branches
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -216,8 +300,8 @@ class CreateReleaseTest extends TestCase
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'title' => 'feat: a feature',
                 'base' => ['ref' => 'main'],
-            ]])),
-            new Response(200, [], $this->json([])),
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
@@ -272,11 +356,11 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json([[
                 'name' => 'v1.0.0',
                 'commit' => ['sha' => 'sha'],
-            ]])), // tags
+            ]])), // pull requests (malformed item skipped before conversion)
             new Response(200, [], $this->json([
                 'committer' => ['date' => '2024-01-01T00:00:00Z'],
-            ])), // commits
-            new Response(200, [], $this->json([])), // pull requests
+            ])), // unused commit response
+            new Response(200, [], $this->json([])), // unused pull requests response
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -300,7 +384,7 @@ class CreateReleaseTest extends TestCase
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -325,7 +409,7 @@ class CreateReleaseTest extends TestCase
                 'title' => 'New feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -389,14 +473,14 @@ class CreateReleaseTest extends TestCase
                     'merge_commit_sha' => 'tagsha',
                     'base' => ['ref' => 'main'],
                 ],
-            ])),
+            ])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
-            ])),
+            ])), // tags
             new Response(200, [], $this->json([
                 'base_commit' => ['sha' => 'tagsha', 'commit' => ['committer' => ['date' => '2024-01-01T00:00:00Z']]],
                 'commits' => [['sha' => 'earlierFixSha'], ['sha' => 'newFixSha']],
-            ])),
+            ])), // commits since the tag
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
@@ -423,14 +507,14 @@ class CreateReleaseTest extends TestCase
                 'merged_at' => '2026-09-11T05:44:09Z',
                 'merge_commit_sha' => 'tagsha',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
-            ])),
+            ])), // tags
             new Response(200, [], $this->json([
                 'base_commit' => ['sha' => 'tagsha', 'commit' => ['committer' => ['date' => '2026-09-11T05:44:08Z']]],
                 'commits' => [],
-            ])),
+            ])), // commits since the tag
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
@@ -469,11 +553,11 @@ class CreateReleaseTest extends TestCase
                 'merged_at' => '2024-01-03T00:00:00Z',
                 'merge_commit_sha' => 'fixSha',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']],
-            ])),
-            new Response(200, [], $this->json(['commits' => [['sha' => 'fixSha']]])),
+            ])), // tags
+            new Response(200, [], $this->json(['commits' => [['sha' => 'fixSha']]])), // commits since the tag
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
@@ -535,10 +619,10 @@ class CreateReleaseTest extends TestCase
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v0.1.0-rc.1', 'commit' => ['sha' => 'tagSha']],
-            ])),
+            ])), // tags
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -569,10 +653,10 @@ class CreateReleaseTest extends TestCase
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
-            ]])),
+            ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v0.1.0', 'commit' => ['sha' => 'tagSha']],
-            ])),
+            ])), // tags
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -786,8 +870,8 @@ class CreateReleaseTest extends TestCase
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
-            ]])),
-            new Response(200, [], $this->json([])),
+            ]])), // pull requests
+            new Response(200, [], $this->json([])), // tags
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);

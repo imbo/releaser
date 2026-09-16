@@ -58,7 +58,7 @@ class DeleteReleaseTest extends TestCase
     public function testDeleteRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])),
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])), // release by tag
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
@@ -79,9 +79,9 @@ class DeleteReleaseTest extends TestCase
     public function testDeleteReleasePreservesZeroPrerelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 42, 'tag_name' => 'v1.2.3-0'])),
-            new Response(204),
-            new Response(204),
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => 'v1.2.3-0'])), // release by tag
+            new Response(204), // delete release
+            new Response(204), // delete tag
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => 'v1.2.3-0'], ['interactive' => false]);
@@ -98,7 +98,7 @@ class DeleteReleaseTest extends TestCase
 
     public function testDeleteTagOnlyPreservesZeroPrerelease(): void
     {
-        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204)); // delete tag
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
         $commandTester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => 'v1.2.3-0'], ['interactive' => false]);
 
@@ -111,7 +111,7 @@ class DeleteReleaseTest extends TestCase
     public function testDeleteTagOnly(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(204),
+            new Response(204), // delete tag
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -150,9 +150,9 @@ class DeleteReleaseTest extends TestCase
     public function testReportsRecoveryCommandWhenTagDeletionFails(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])),
-            new Response(204),
-            new Response(500),
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])), // release by tag
+            new Response(204), // delete release
+            new Response(500), // delete tag
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -164,7 +164,7 @@ class DeleteReleaseTest extends TestCase
     public function testRethrowsTagDeletionFailureWhenDeletingTagOnly(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(500),
+            new Response(500), // delete tag
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -203,9 +203,9 @@ class DeleteReleaseTest extends TestCase
     {
         $version = "-release'&v1.2.3";
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 42, 'tag_name' => $version])),
-            new Response(204),
-            new Response(500),
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => $version])), // release by tag
+            new Response(204), // delete release
+            new Response(500), // delete tag
         );
         $tester = new CommandTester($this->createCommand($guzzleClient));
 
@@ -220,7 +220,7 @@ class DeleteReleaseTest extends TestCase
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
                 ['id' => 99, 'name' => null, 'tag_name' => '2.0.0', 'draft' => true, 'html_url' => 'url', 'created_at' => '2026-01-02T00:00:00Z'],
-            ])),
+            ])), // releases
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
@@ -243,13 +243,13 @@ class DeleteReleaseTest extends TestCase
     public function testDeleteDraftByVersion(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // release by tag
             new Response(200, [], $this->json([[
                 'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
                 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
-            ]])),
-            new Response(204),
-            new Response(204),
+            ]])), // releases
+            new Response(204), // delete release
+            new Response(204), // delete tag
         );
         $tester = new CommandTester($this->createCommand($guzzleClient));
         $tester->execute(['--repository' => 'owner/repo', 'version' => 'v1.0.0'], ['interactive' => false]);
@@ -266,10 +266,10 @@ class DeleteReleaseTest extends TestCase
             new Response(200, [], $this->json([[
                 'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
                 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
-            ]])),
-            new Response(200, [], $this->json(['id' => 99, 'tag_name' => 'v2.0.0'])),
-            new Response(204),
-            new Response(204),
+            ]])), // releases
+            new Response(200, [], $this->json(['id' => 99, 'tag_name' => 'v2.0.0'])), // release by tag
+            new Response(204), // delete release
+            new Response(204), // delete tag
         );
         $tester = new CommandTester($this->createCommand($guzzleClient));
         $tester->setInputs(['v1.0.0', 'no']);
@@ -285,7 +285,7 @@ class DeleteReleaseTest extends TestCase
     public function testInteractThrowsWhenNoReleasesFound(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([])),
+            new Response(200, [], $this->json([])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -300,7 +300,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -314,7 +314,7 @@ class DeleteReleaseTest extends TestCase
     public function testInteractSkipsPromptWhenVersionProvided(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 10, 'tag_name' => '3.0.0'])),
+            new Response(200, [], $this->json(['id' => 10, 'tag_name' => '3.0.0'])), // release by tag
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
@@ -335,7 +335,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Nightly release', 'tag_name' => 'nightly', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
