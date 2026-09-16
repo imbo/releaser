@@ -70,6 +70,10 @@ class DeleteRelease extends BaseCommand
               specified, you will be prompted to select from the available releases when
               running interactively. Use the <info>%s</info> command to view the available releases.
 
+              Both the argument and selection list support version tags, including prereleases
+              and custom prefixes (e.g. 1.2.3, v1.2.3-rc.1, or release-1.2.3).
+              Tags such as nightly are not supported, including with <info>--tag-only</info>.
+
             <comment>Tag only</comment>
               Use <info>--tag-only</info> to delete only the Git tag. This is useful for recovering
               from an incomplete release deletion. The <info>version</info> argument is required
@@ -122,7 +126,7 @@ class DeleteRelease extends BaseCommand
 
         $progress->finish('Fetched releases');
         if ([] === $releases) {
-            throw new RuntimeException(sprintf('No releases found for repository "%s".', $repository));
+            throw new RuntimeException(sprintf('No releases with supported version tags found in repository "%s".', $repository));
         }
 
         $question = new ChoiceQuestion('Select the release to delete:', $releases);

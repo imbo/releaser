@@ -24,7 +24,11 @@ class ListReleases extends BaseCommand
 
     protected function commandHelp(): string
     {
-        return 'This command will list all releases of a project on GitHub.';
+        return <<<'HELP'
+        This command lists GitHub releases whose tags match the supported version format,
+        including prereleases and custom prefixes (e.g. 1.2.3, v1.2.3-rc.1, or release-1.2.3).
+        Releases with tags such as nightly are not listed.
+        HELP;
     }
 
     /**
@@ -36,9 +40,10 @@ class ListReleases extends BaseCommand
      */
     public function execute(InputInterface $input, OutputInterface $output): int
     {
-        $releases = $this->getReleases($this->getRepository($input), $output);
+        $repository = $this->getRepository($input);
+        $releases = $this->getReleases($repository, $output);
         if ([] === $releases) {
-            $output->writeln('<info>No releases found for the repository.</info>');
+            $output->writeln(sprintf('<info>No releases with supported version tags found in repository "%s".</info>', $repository));
 
             return self::SUCCESS;
         }
