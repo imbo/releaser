@@ -125,6 +125,26 @@ class ReleaseTest extends TestCase
         $this->assertFalse($release->draft);
     }
 
+    public function testPreservesReleaseId(): void
+    {
+        $release = Release::fromAPI([
+            'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+            'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+        ]);
+
+        $this->assertSame(42, $release->id);
+    }
+
+    public function testRejectsInvalidReleaseId(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid "id" value');
+        Release::fromAPI([
+            'id' => '42', 'name' => 'Draft', 'tag_name' => 'v1.0.0',
+            'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+        ]);
+    }
+
     public function testFromAPIWithNullName(): void
     {
         $release = Release::fromAPI([

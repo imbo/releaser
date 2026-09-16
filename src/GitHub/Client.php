@@ -211,6 +211,7 @@ final class Client
      * Delete a GitHub release, leaving its associated Git tag in place.
      *
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-a-release-by-tag-name
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#list-releases
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#delete-a-release
      *
      * @throws RuntimeException
@@ -220,6 +221,20 @@ final class Client
         try {
             $response = $this->httpClient->request('GET', sprintf('/repos/%s/releases/tags/%s', $repository, rawurlencode((string) $version)));
         } catch (TransferException $e) {
+            if ($e instanceof ResponseException && 404 === $e->getResponse()->getStatusCode()) {
+                foreach ($this->getReleases($repository) as $release) {
+                    if ($release->draft && $release->tagName === (string) $version) {
+                        if (null === $release->id) {
+                            throw new RuntimeException(sprintf('Missing required "id" key for release with version "%s"', $version));
+                        }
+
+                        $this->deleteReleaseById($repository, $release->id);
+
+                        return;
+                    }
+                }
+            }
+
             throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
 
@@ -229,10 +244,22 @@ final class Client
             throw new RuntimeException(sprintf('Missing required "id" key for release with version "%s"', $version));
         }
 
+        $this->deleteReleaseById($repository, $releaseId);
+    }
+
+    /**
+     * Delete a published or draft release by its GitHub ID, leaving its tag in place.
+     *
+     * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#delete-a-release
+     *
+     * @throws RuntimeException
+     */
+    public function deleteReleaseById(Repository $repository, int $releaseId): void
+    {
         try {
             $this->httpClient->request('DELETE', sprintf('/repos/%s/releases/%d', $repository, $releaseId));
         } catch (TransferException $e) {
-            throw new RuntimeException(sprintf('Failed to delete GitHub release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
+            throw new RuntimeException(sprintf('Failed to delete GitHub release with ID %d in repository "%s", got: "%s"', $releaseId, $repository, $this->responseStatus($e)), previous: $e);
         }
     }
 

@@ -219,9 +219,8 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z'],
-                ['name' => null, 'tag_name' => '2.0.0', 'html_url' => 'url', 'created_at' => '2026-01-02T00:00:00Z'],
+                ['id' => 99, 'name' => null, 'tag_name' => '2.0.0', 'draft' => true, 'html_url' => 'url', 'created_at' => '2026-01-02T00:00:00Z'],
             ])),
-            new Response(200, [], $this->json(['id' => 99, 'tag_name' => '2.0.0'])),
             new Response(204), // Delete release
             new Response(204), // Delete tag
         );
@@ -234,11 +233,53 @@ class DeleteReleaseTest extends TestCase
         $this->assertStringContainsString('Successfully deleted release', $commandTester->getDisplay());
         $this->assertStringContainsString('Successfully deleted tag', $commandTester->getDisplay());
 
-        $this->assertCount(4, $history);
+        $this->assertCount(3, $history);
         $this->assertSame('/repos/owner/repo/releases?per_page=100', (string) $history[0]['request']->getUri());
-        $this->assertSame('/repos/owner/repo/releases/tags/2.0.0', (string) $history[1]['request']->getUri());
-        $this->assertSame('/repos/owner/repo/releases/99', (string) $history[2]['request']->getUri());
-        $this->assertSame('/repos/owner/repo/git/refs/tags/2.0.0', (string) $history[3]['request']->getUri());
+        $this->assertSame('DELETE', $history[1]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases/99', (string) $history[1]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/2.0.0', (string) $history[2]['request']->getUri());
+    }
+
+    public function testDeleteDraftByVersion(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(404),
+            new Response(200, [], $this->json([[
+                'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])),
+            new Response(204),
+            new Response(204),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute(['--repository' => 'owner/repo', 'version' => 'v1.0.0'], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertCount(4, $history);
+        $this->assertSame('/repos/owner/repo/releases/42', (string) $history[2]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/v1.0.0', (string) $history[3]['request']->getUri());
+    }
+
+    public function testDoesNotReuseSelectedReleaseOnNextRun(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])),
+            new Response(200, [], $this->json(['id' => 99, 'tag_name' => 'v2.0.0'])),
+            new Response(204),
+            new Response(204),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->setInputs(['v1.0.0', 'no']);
+        $tester->execute(['--repository' => 'owner/repo']);
+        $this->assertSame(DeleteRelease::ABORTED, $tester->getStatusCode());
+
+        $tester->execute(['--repository' => 'other/repo', 'version' => 'v2.0.0'], ['interactive' => false]);
+        $this->assertSame(DeleteRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertSame('/repos/other/repo/releases/tags/v2.0.0', (string) $history[1]['request']->getUri());
+        $this->assertSame('/repos/other/repo/releases/99', (string) $history[2]['request']->getUri());
     }
 
     public function testInteractThrowsWhenNoReleasesFound(): void
