@@ -10,6 +10,7 @@ use Stringable;
 
 use function array_key_exists;
 use function is_bool;
+use function is_int;
 use function is_string;
 use function sprintf;
 use function trim;
@@ -26,6 +27,7 @@ final class Release implements Stringable
         public readonly DateTimeImmutable $createdAt,
         public readonly ?DateTimeImmutable $publishedAt = null,
         public readonly bool $draft = false,
+        public readonly ?int $id = null,
     ) {
         try {
             $this->version = Version::fromString($this->tagName);
@@ -99,6 +101,11 @@ final class Release implements Stringable
             throw new InvalidArgumentException(sprintf('Invalid "draft" value: %s', var_export($draft, true)));
         }
 
-        return new self($name ?? $tagName, $tagName, $htmlUrl, $createdAtDateTime, $publishedAtDateTime, $draft);
+        $id = $data['id'] ?? null;
+        if (null !== $id && (!is_int($id) || $id < 1)) {
+            throw new InvalidArgumentException(sprintf('Invalid "id" value: %s', var_export($id, true)));
+        }
+
+        return new self($name ?? $tagName, $tagName, $htmlUrl, $createdAtDateTime, $publishedAtDateTime, $draft, $id);
     }
 }

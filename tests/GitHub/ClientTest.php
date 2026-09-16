@@ -591,6 +591,7 @@ class ClientTest extends TestCase
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(404),
+            new Response(200, [], $this->json([])),
         );
 
         $this->expectException(RuntimeException::class);
@@ -617,8 +618,56 @@ class ClientTest extends TestCase
         );
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to delete GitHub release for version "1.0.0", got: "403 Forbidden"');
+        $this->expectExceptionMessage('Failed to delete GitHub release with ID 12345 in repository "owner/repo", got: "403 Forbidden"');
         (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
+    public function testDeleteDraftReleaseFollowsPagination(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(404),
+            new Response(200, ['Link' => '</repos/owner/repo/releases?per_page=100&page=2>; rel="next"'], $this->json([[
+                'id' => 10, 'name' => 'Other draft', 'tag_name' => 'v1.0.0-rc.1', 'draft' => true,
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])),
+            new Response(200, [], $this->json([[
+                'id' => 42, 'name' => 'Matching draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])),
+            new Response(204),
+        );
+        (new Client($guzzleClient))->deleteRelease(new Repository('owner', 'repo'), Version::fromString('v1.0.0'));
+
+        $this->assertCount(4, $history);
+        $this->assertSame('/repos/owner/repo/releases?per_page=100&page=2', (string) $history[2]['request']->getUri());
+        $this->assertSame('DELETE', $history[3]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases/42', (string) $history[3]['request']->getUri());
+    }
+
+    public function testDeleteReleaseDoesNotSearchDraftsOnPermissionError(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(403));
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to find release');
+        try {
+            (new Client($guzzleClient))->deleteRelease(new Repository('owner', 'repo'), Version::fromString('v1.0.0'));
+        } finally {
+            $this->assertCount(1, $history);
+        }
+    }
+
+    public function testDeleteDraftReleaseRequiresId(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(404),
+            new Response(200, [], $this->json([[
+                'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])),
+        );
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing required "id" key');
+        (new Client($guzzleClient))->deleteRelease(new Repository('owner', 'repo'), Version::fromString('v1.0.0'));
     }
 
     #[DataProvider('tagNameProvider')]

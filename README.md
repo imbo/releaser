@@ -127,6 +127,8 @@ imbo-releaser delete --help
 
 This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
 
+Draft releases are supported too: supply their tag name as the version or select them from the list. Your token must have access to the draft.
+
 Pass `-d` or `--dry-run` with a version to preview the deletion without deleting the GitHub release or tag.
 
 The GitHub release and its tag are deleted in separate steps. If the release is deleted but deleting the tag fails, remove the remaining tag with:

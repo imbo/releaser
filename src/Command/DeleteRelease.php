@@ -28,6 +28,14 @@ class DeleteRelease extends BaseCommand
 {
     public const NAME = 'delete';
 
+    private ?Release $selectedRelease = null;
+
+    public function initialize(InputInterface $input, OutputInterface $output): void
+    {
+        parent::initialize($input, $output);
+        $this->selectedRelease = null;
+    }
+
     /**
      * Configure the command options and arguments.
      */
@@ -88,8 +96,8 @@ class DeleteRelease extends BaseCommand
             return;
         }
 
-        $release = (string) $this->selectRelease($this->getRepository($input), $input, $output);
-        $input->setArgument('version', $release);
+        $this->selectedRelease = $this->selectRelease($this->getRepository($input), $input, $output);
+        $input->setArgument('version', $this->selectedRelease->tagName);
     }
 
     /**
@@ -177,7 +185,11 @@ class DeleteRelease extends BaseCommand
         }
 
         if (!$tagOnly) {
-            $this->gitHubClient->deleteRelease($repository, $version);
+            if (null !== $this->selectedRelease?->id) {
+                $this->gitHubClient->deleteReleaseById($repository, $this->selectedRelease->id);
+            } else {
+                $this->gitHubClient->deleteRelease($repository, $version);
+            }
             $output->writeln(sprintf('Successfully deleted release <info>%s</info>', $version));
         }
 
