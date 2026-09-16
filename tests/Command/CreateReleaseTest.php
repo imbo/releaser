@@ -24,6 +24,42 @@ class CreateReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
 
+    public function testGroupsTypesCaseInsensitively(): void
+    {
+        $config = new class extends Config {
+            public function pullRequestGroups(): array
+            {
+                return [...parent::pullRequestGroups(), 'Custom Changes' => ['CUSTOM']];
+            }
+        };
+        $prs = [];
+        foreach (['FEAT: uppercase feature', 'Feat: mixed-case feature', 'FIX: uppercase fix', 'custom: custom change'] as $index => $title) {
+            $prs[] = [
+                'number' => $index + 1,
+                'user' => ['login' => 'alice'],
+                'title' => $title,
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge'.$index,
+            ];
+        }
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json($prs)),
+            new Response(200, [], $this->json([['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']]])),
+            new Response(200, [], $this->json(['commits' => [['sha' => 'merge0'], ['sha' => 'merge1'], ['sha' => 'merge2'], ['sha' => 'merge3']]])),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient, $config));
+        $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('with tag "v1.1.0"', $display);
+        $this->assertMatchesRegularExpression('/## New Features[^#]*uppercase feature[^#]*mixed-case feature/s', $display);
+        $this->assertMatchesRegularExpression('/## Bug Fixes[^#]*uppercase fix/s', $display);
+        $this->assertMatchesRegularExpression('/## Custom Changes[^#]*custom change/s', $display);
+        $this->assertStringNotContainsString('Other Changes', $display);
+    }
+
     public function testMissingBranch(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();

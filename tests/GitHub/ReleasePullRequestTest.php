@@ -5,6 +5,7 @@ namespace ImboReleaser\GitHub;
 use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(ReleasePullRequest::class)]
@@ -31,5 +32,32 @@ class ReleasePullRequestTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Pull request #123 does not have a valid Conventional Commit message.');
         ReleasePullRequest::fromPullRequest($pullRequest);
+    }
+
+    /**
+     * @return iterable<string,array{title:string}>
+     */
+    public static function uppercaseTypeProvider(): iterable
+    {
+        yield 'uppercase' => ['title' => 'FEAT: add a feature'];
+        yield 'mixed case' => ['title' => 'Feat: add a feature'];
+        yield 'scoped breaking change' => ['title' => 'FIX(API)!: change behavior'];
+        yield 'custom type' => ['title' => 'Custom: change behavior'];
+    }
+
+    #[DataProvider('uppercaseTypeProvider')]
+    public function testAcceptsUppercaseTypes(string $title): void
+    {
+        $pr = ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('alice'), new DateTimeImmutable(), $title, 'main'));
+
+        $this->assertSame($title, trim((string) $pr->message));
+    }
+
+    public function testAcceptsUppercaseScopeDescriptionAndBreakingFooter(): void
+    {
+        $pr = ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('alice'), new DateTimeImmutable(), "feat(API): Add a feature\n\nBREAKING CHANGE: Replace the API", 'main'));
+
+        $this->assertSame('feat', $pr->message->getType()->toString());
+        $this->assertTrue($pr->message->hasBreakingChanges());
     }
 }
