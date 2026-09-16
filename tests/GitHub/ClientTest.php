@@ -484,6 +484,50 @@ class ClientTest extends TestCase
         $this->assertFalse($releasePayload['prerelease']);
     }
 
+    /**
+     * @return array<string,array{string,string,bool,bool}>
+     */
+    public static function latestReleasePolicyProvider(): array
+    {
+        return [
+            'stable main release' => ['main', 'v2.0.0', false, false],
+            'maintenance patch' => ['v1.x', 'v1.0.1', false, false],
+            'draft' => ['main', 'v2.0.0', true, false],
+            'prerelease' => ['main', 'v2.0.0-rc.1', false, true],
+            'draft prerelease' => ['main', 'v2.0.0-rc.1', true, true],
+        ];
+    }
+
+    #[DataProvider('latestReleasePolicyProvider')]
+    public function testCreateReleaseDelegatesLatestSelectionToGitHub(string $branchName, string $version, bool $draft, bool $prerelease): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
+            new Response(201, [], $this->json(['ref' => 'refs/tags/'.$version])),
+            new Response(201, [], $this->json([
+                'name' => $version,
+                'tag_name' => $version,
+                'html_url' => 'https://github.com/owner/repo/releases/tag/'.$version,
+                'created_at' => '2026-01-01T00:00:00Z',
+            ])),
+        );
+
+        (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch($branchName), Version::fromString($version), 'Release notes', draft: $draft, prerelease: $prerelease);
+
+        $this->assertCount(4, $history);
+        $this->assertSame('POST', $history[3]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases', (string) $history[3]['request']->getUri());
+        $body = $history[3]['request']->getBody()->getContents();
+        $this->assertJson($body);
+        /** @var array<string,mixed> $releasePayload */
+        $releasePayload = json_decode($body, true);
+        $this->assertSame('legacy', $releasePayload['make_latest']);
+        $this->assertSame($version, $releasePayload['tag_name']);
+        $this->assertSame($draft, $releasePayload['draft']);
+        $this->assertSame($prerelease, $releasePayload['prerelease']);
+    }
+
     public function testGetMergedPullRequestsSkipsDrafts(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(

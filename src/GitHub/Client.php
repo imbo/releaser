@@ -192,9 +192,10 @@ final class Client
                     'generate_release_notes' => false,
                     'draft' => $draft,
                     'prerelease' => $prerelease,
+                    // Let GitHub consider creation date and SemVer for maintenance releases too.
+                    'make_latest' => 'legacy',
 
                     // 'discussion_category_name' => '...',
-                    // 'make_latest' => 'Can be one of: true, false, legacy',
                 ],
             ]);
         } catch (TransferException $e) {
