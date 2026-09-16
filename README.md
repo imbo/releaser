@@ -226,6 +226,8 @@ See GitHub's [personal access token documentation](https://docs.github.com/en/au
 
 Release notes are generated using [Twig](https://twig.symfony.com/) templates. The default template groups changes by Conventional Commit type and credits the contributors.
 
+Pull request entries include their scopes and mark breaking changes with `!`. Text from `BREAKING CHANGE` or `BREAKING-CHANGE` footers appears beneath the entry, including any migration guidance provided there.
+
 To use a custom template, either override `template()` in your config or pass `--template` on the command line when running the `create` command.
 
 Templates produce Markdown, so characters such as `<`, `>`, and `&` are preserved rather than converted to HTML entities. This keeps code examples and links intact.

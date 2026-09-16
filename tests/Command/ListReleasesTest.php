@@ -27,7 +27,7 @@ class ListReleasesTest extends TestCase
     public function testNoReleases(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([])),
+            new Response(200, [], $this->json([])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -40,7 +40,7 @@ class ListReleasesTest extends TestCase
     public function testReportsResolvedConfigurationFile(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([])),
+            new Response(200, [], $this->json([])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -76,7 +76,7 @@ class ListReleasesTest extends TestCase
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-03T00:00:00Z', 'published_at' => '2026-02-01T00:00:00Z'],
                 ['name' => null, 'tag_name' => '1.2.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.2.0', 'created_at' => '2026-01-01T00:00:00Z', 'published_at' => '2026-02-03T00:00:00Z'],
                 ['name' => 'Release 1.1.0', 'tag_name' => '1.1.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.1.0', 'created_at' => '2026-01-02T00:00:00Z', 'published_at' => '2026-02-02T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -104,7 +104,7 @@ class ListReleasesTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -141,7 +141,7 @@ class ListReleasesTest extends TestCase
             'created_at' => '2026-01-01T00:00:00Z',
             ...$release,
         ], $reverse ? array_reverse($releases) : $releases);
-        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json($releases)));
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json($releases))); // releases
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
 
@@ -157,7 +157,7 @@ class ListReleasesTest extends TestCase
             new Response(200, [], $this->json([
                 ['name' => 'Nightly release', 'tag_name' => 'nightly', 'html_url' => 'https://github.com/owner/repo/releases/tag/nightly', 'created_at' => '2026-01-01T00:00:00Z'],
                 ['name' => 'Release 2.0.0', 'tag_name' => '2.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/2.0.0', 'created_at' => '2026-01-02T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);

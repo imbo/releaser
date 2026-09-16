@@ -31,7 +31,7 @@ class ClientTest extends TestCase
             ->expects($this->once())
             ->method('request')
             ->with('GET', '/repos/owner/repo/tags?per_page=100')
-            ->willReturn(new Response(200, [], $this->json([])));
+            ->willReturn(new Response(200, [], $this->json([]))); // tags
 
         $tags = iterator_to_array((new Client($httpClient))->getTags(Repository::fromString('owner/repo')));
 
@@ -44,10 +44,10 @@ class ClientTest extends TestCase
             new Response(200, ['Link' => '<http://next-page>; rel="next"'], $this->json([
                 ['name' => 'main'],
                 ['name' => 'develop'],
-            ])),
+            ])), // branches (page 1)
             new Response(200, [], $this->json([
                 ['name' => 'testing'],
-            ])),
+            ])), // branches (page 2)
         );
 
         $gitHubClient = new Client($guzzleClient);
@@ -69,10 +69,10 @@ class ClientTest extends TestCase
             new Response(200, ['Link' => '<http://next-page>; rel="next"'], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
                 ['name' => 'Release 1.1.0', 'tag_name' => '1.1.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.1.0', 'created_at' => '2026-01-02T00:00:00Z'],
-            ])),
+            ])), // releases (page 1)
             new Response(200, [], $this->json([
                 ['name' => 'Release 2.0.0', 'tag_name' => '2.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/2.0.0', 'created_at' => '2026-01-03T00:00:00Z'],
-            ])),
+            ])), // releases (page 2)
         );
 
         $gitHubClient = new Client($guzzleClient);
@@ -94,7 +94,7 @@ class ClientTest extends TestCase
             new Response(200, [], $this->json([
                 ['name' => '1.1.1', 'commit' => ['sha' => 'abc123']],
                 ['name' => 'some-tag', 'commit' => ['sha' => 'def456']],
-            ])),
+            ])), // tags
         );
 
         $gitHubClient = new Client($guzzleClient);
@@ -136,7 +136,7 @@ class ClientTest extends TestCase
 
                 // skipped because of missing merged_at
                 ['number' => 1, 'user' => ['login' => 'some-user'], 'title' => 'some title', 'merged_at' => null, 'base' => ['ref' => 'main']],
-            ])),
+            ])), // pull requests
         );
 
         $client = new Client($guzzleClient);
@@ -155,7 +155,7 @@ class ClientTest extends TestCase
     public function testFetchPaginatedWithErrorResponse(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404, [], 'Not Found'),
+            new Response(404, [], 'Not Found'), // tags
         );
 
         $this->expectException(RuntimeException::class);
@@ -166,7 +166,7 @@ class ClientTest extends TestCase
     public function testFetchPaginatedWithServerErrorResponse(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(500, [], 'Internal Server Error'),
+            new Response(500, [], 'Internal Server Error'), // tags
         );
 
         $this->expectException(RuntimeException::class);
@@ -177,7 +177,7 @@ class ClientTest extends TestCase
     public function testFetchPaginatedWithNoJSON(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], 'some data'),
+            new Response(200, [], 'some data'), // tags
         );
 
         $this->expectException(RuntimeException::class);
@@ -188,7 +188,7 @@ class ClientTest extends TestCase
     public function testFetchPaginatedWithNonArrayInJSON(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], '"not an array"'),
+            new Response(200, [], '"not an array"'), // tags
         );
 
         $this->expectException(RuntimeException::class);
@@ -199,7 +199,7 @@ class ClientTest extends TestCase
     public function testFetchPaginatedWithInvalidArrayInJSON(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['not', 'valid'])),
+            new Response(200, [], $this->json(['not', 'valid'])), // tags
         );
 
         $this->expectException(RuntimeException::class);
@@ -212,9 +212,9 @@ class ClientTest extends TestCase
         $shas = array_map(static fn (int $number): string => 'sha'.$number, range(1, 251));
         $commits = array_map(static fn (string $sha): array => ['sha' => $sha], $shas);
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, ['Link' => '</comparison?page=2>; rel="next"'], $this->json(['commits' => array_slice($commits, 0, 100)])),
-            new Response(200, ['Link' => '</comparison?page=3>; rel="next"'], $this->json(['commits' => array_slice($commits, 100, 100)])),
-            new Response(200, [], $this->json(['commits' => array_slice($commits, 200)])),
+            new Response(200, ['Link' => '</comparison?page=2>; rel="next"'], $this->json(['commits' => array_slice($commits, 0, 100)])), // commits (page 1)
+            new Response(200, ['Link' => '</comparison?page=3>; rel="next"'], $this->json(['commits' => array_slice($commits, 100, 100)])), // commits (page 2)
+            new Response(200, [], $this->json(['commits' => array_slice($commits, 200)])), // commits (page 3)
         );
 
         $actual = iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'baseSha', 'release/1+2'));
@@ -228,7 +228,7 @@ class ClientTest extends TestCase
 
     public function testGetCommitShasBetweenWithNoNewCommits(): void
     {
-        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json(['commits' => []])));
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json(['commits' => []]))); // commits
 
         $this->assertSame([], iterator_to_array((new Client($guzzleClient))->getCommitShasBetween(new Repository('owner', 'repo'), 'sameSha', 'sameSha')));
     }
@@ -253,7 +253,7 @@ class ClientTest extends TestCase
     #[DataProvider('invalidComparisonProvider')]
     public function testGetCommitShasBetweenRejectsInvalidResponse(array $data): void
     {
-        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json($data)));
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json($data))); // commits
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('GitHub comparison response');
@@ -262,7 +262,7 @@ class ClientTest extends TestCase
 
     public function testGetCommitShasBetweenFailsWhenComparisonIsUnavailable(): void
     {
-        [$guzzleClient] = $this->getGuzzleClient(new Response(404));
+        [$guzzleClient] = $this->getGuzzleClient(new Response(404)); // commits
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('404 Not Found');
@@ -272,7 +272,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTimeWithServerError(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // commit
         );
 
         $this->expectException(RuntimeException::class);
@@ -283,7 +283,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTimeWithMissingCommitter(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['sha' => 'abc123'])),
+            new Response(200, [], $this->json(['sha' => 'abc123'])), // commit
         );
 
         $this->expectException(RuntimeException::class);
@@ -294,7 +294,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTimeWithMissingDate(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['sha' => 'abc123', 'committer' => ['name' => 'Some User']])),
+            new Response(200, [], $this->json(['sha' => 'abc123', 'committer' => ['name' => 'Some User']])), // commit
         );
 
         $this->expectException(RuntimeException::class);
@@ -305,7 +305,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTimeWithInvalidDate(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['committer' => ['date' => 'not-a-date']])),
+            new Response(200, [], $this->json(['committer' => ['date' => 'not-a-date']])), // commit
         );
 
         $this->expectException(InvalidArgumentException::class);
@@ -316,7 +316,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTimeWithConnectionError(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new ConnectException('Connection failed', new Request('GET', 'https://api.github.com')),
+            new ConnectException('Connection failed', new Request('GET', 'https://api.github.com')), // commit
         );
 
         $this->expectException(RuntimeException::class);
@@ -327,7 +327,7 @@ class ClientTest extends TestCase
     public function testGetShaDateTime(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['sha' => 'abc123', 'committer' => ['date' => '2026-01-01T00:00:00Z']])),
+            new Response(200, [], $this->json(['sha' => 'abc123', 'committer' => ['date' => '2026-01-01T00:00:00Z']])), // commit
         );
 
         $date = (new Client($guzzleClient))->getShaDateTime(Repository::fromString('owner/repo'), 'abc123');
@@ -340,7 +340,7 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithServerErrorWhenFetchingBranchSha(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // branch sha
         );
 
         $this->expectException(RuntimeException::class);
@@ -351,7 +351,7 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithInvalidBranchShaData(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['sha' => null])),
+            new Response(200, [], $this->json(['sha' => null])), // branch sha
         );
 
         $this->expectException(RuntimeException::class);
@@ -362,8 +362,8 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithServerErrorWhenCreatingTag(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(422),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(422), // tag object creation
         );
 
         $this->expectException(RuntimeException::class);
@@ -374,8 +374,8 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithMissingShaInTagResponse(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['tag' => '1.0.0'])),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['tag' => '1.0.0'])), // tag object creation
         );
 
         $this->expectException(RuntimeException::class);
@@ -386,9 +386,9 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithServerErrorWhenCreatingRef(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
-            new Response(422),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(422), // tag reference creation
         );
 
         $this->expectException(RuntimeException::class);
@@ -399,10 +399,10 @@ class ClientTest extends TestCase
     public function testCreateReleaseWithServerErrorWhenCreatingRelease(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
-            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
-            new Response(422),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])), // tag reference creation
+            new Response(422), // release creation
         );
 
         $this->expectException(ReleaseCreationException::class);
@@ -414,15 +414,15 @@ class ClientTest extends TestCase
     public function testCreateRelease(string $branchName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
-            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])), // tag reference creation
             new Response(201, [], $this->json([
                 'name' => 'release name',
                 'tag_name' => 'v1.1.1',
                 'html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.0',
                 'created_at' => '2024-01-01T00:00:00Z',
-            ])),
+            ])), // release creation
         );
 
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch($branchName), Version::fromString('1.0.0'), 'Release 1.0.0', 'Release 1.0', true, true);
@@ -466,15 +466,15 @@ class ClientTest extends TestCase
     public function testCreateReleaseIsNotPrereleaseByDefault(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
-            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(201, [], $this->json(['ref' => 'refs/tags/1.0.0'])), // tag reference creation
             new Response(201, [], $this->json([
                 'name' => 'release name',
                 'tag_name' => '1.0.0',
                 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0',
                 'created_at' => '2024-01-01T00:00:00Z',
-            ])),
+            ])), // release creation
         );
 
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch('main'), Version::fromString('1.0.0'), 'Release 1.0.0');
@@ -502,15 +502,15 @@ class ClientTest extends TestCase
     public function testCreateReleaseDelegatesLatestSelectionToGitHub(string $branchName, string $version, bool $draft, bool $prerelease): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
-            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])),
-            new Response(201, [], $this->json(['ref' => 'refs/tags/'.$version])),
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])), // branch sha
+            new Response(200, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(201, [], $this->json(['ref' => 'refs/tags/'.$version])), // tag reference creation
             new Response(201, [], $this->json([
                 'name' => $version,
                 'tag_name' => $version,
                 'html_url' => 'https://github.com/owner/repo/releases/tag/'.$version,
                 'created_at' => '2026-01-01T00:00:00Z',
-            ])),
+            ])), // release creation
         );
 
         (new Client($guzzleClient))->createRelease(Repository::fromString('owner/repo'), new Branch($branchName), Version::fromString($version), 'Release notes', draft: $draft, prerelease: $prerelease);
@@ -534,7 +534,7 @@ class ClientTest extends TestCase
             new Response(200, [], $this->json([
                 ['number' => 1, 'user' => ['login' => 'user1'], 'title' => 'feat: new feature', 'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main'], 'draft' => true],
                 ['number' => 2, 'user' => ['login' => 'user2'], 'title' => 'fix: a bug', 'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main'], 'draft' => false],
-            ])),
+            ])), // pull requests
         );
 
         $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
@@ -549,7 +549,7 @@ class ClientTest extends TestCase
             new Response(200, [], $this->json([
                 ['number' => 1, 'user' => null, 'title' => 'feat: new feature', 'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main']],
                 ['number' => 2, 'user' => ['login' => 'user2'], 'title' => 'fix: a bug', 'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main']],
-            ])),
+            ])), // pull requests
         );
 
         $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
@@ -573,8 +573,8 @@ class ClientTest extends TestCase
     public function testDeleteRelease(string $tagName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => $tagName])),
-            new Response(204),
+            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => $tagName])), // release by tag
+            new Response(204), // delete release
         );
 
         (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString($tagName));
@@ -590,8 +590,8 @@ class ClientTest extends TestCase
     public function testDeleteReleaseWithServerErrorWhenFetchingRelease(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404),
-            new Response(200, [], $this->json([])),
+            new Response(404), // release by tag
+            new Response(200, [], $this->json([])), // releases
         );
 
         $this->expectException(RuntimeException::class);
@@ -602,7 +602,7 @@ class ClientTest extends TestCase
     public function testDeleteReleaseWithMissingId(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['tag_name' => '1.0.0'])),
+            new Response(200, [], $this->json(['tag_name' => '1.0.0'])), // release by tag
         );
 
         $this->expectException(RuntimeException::class);
@@ -613,8 +613,8 @@ class ClientTest extends TestCase
     public function testDeleteReleaseWithServerErrorWhenDeletingRelease(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => '1.0.0'])),
-            new Response(403),
+            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => '1.0.0'])), // release by tag
+            new Response(403), // delete release
         );
 
         $this->expectException(RuntimeException::class);
@@ -625,16 +625,16 @@ class ClientTest extends TestCase
     public function testDeleteDraftReleaseFollowsPagination(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // release by tag
             new Response(200, ['Link' => '</repos/owner/repo/releases?per_page=100&page=2>; rel="next"'], $this->json([[
                 'id' => 10, 'name' => 'Other draft', 'tag_name' => 'v1.0.0-rc.1', 'draft' => true,
                 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
-            ]])),
+            ]])), // releases (page 1)
             new Response(200, [], $this->json([[
                 'id' => 42, 'name' => 'Matching draft', 'tag_name' => 'v1.0.0', 'draft' => true,
                 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
-            ]])),
-            new Response(204),
+            ]])), // releases (page 2)
+            new Response(204), // delete release
         );
         (new Client($guzzleClient))->deleteRelease(new Repository('owner', 'repo'), Version::fromString('v1.0.0'));
 
@@ -646,7 +646,7 @@ class ClientTest extends TestCase
 
     public function testDeleteReleaseDoesNotSearchDraftsOnPermissionError(): void
     {
-        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(403));
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(403)); // release by tag
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Failed to find release');
         try {
@@ -659,11 +659,11 @@ class ClientTest extends TestCase
     public function testDeleteDraftReleaseRequiresId(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // release by tag
             new Response(200, [], $this->json([[
                 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
                 'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
-            ]])),
+            ]])), // releases
         );
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Missing required "id" key');
@@ -674,7 +674,7 @@ class ClientTest extends TestCase
     public function testDeleteTag(string $tagName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(204),
+            new Response(204), // delete tag
         );
 
         (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString($tagName));
@@ -688,7 +688,7 @@ class ClientTest extends TestCase
     public function testDeleteTagWithServerError(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(404),
+            new Response(404), // delete tag
         );
 
         $this->expectException(RuntimeException::class);

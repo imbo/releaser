@@ -1,7 +1,14 @@
 {% for group, prs in groupedPullRequests %}
 ## {{ group }}
 {% for pr in prs %}
-* {{ pr.message.type }}: {{ pr.message.description }} by @{{ pr.user.login }} in {{ repository.url }}/pull/{{ pr.number }}
+* {{ pr.message.type }}{% if pr.message.scope %}({{ pr.message.scope }}){% endif %}{% if pr.message.hasBreakingChanges %}!{% endif %}: {{ pr.message.description }} by @{{ pr.user.login }} in {{ repository.url }}/pull/{{ pr.number }}
+{% for footer in pr.message.footers %}
+{% if footer.token == 'BREAKING CHANGE' %}
+
+  **BREAKING CHANGE:** {{ footer.value|replace({"\r\n": "\n", "\r": "\n"})|replace({"\n": "\n  "}) }}
+
+{% endif %}
+{% endfor %}
 {% endfor %}
 
 {% endfor %}

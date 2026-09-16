@@ -45,7 +45,7 @@ class BaseCommandTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
                 ['name' => 'Release 1.0.0', 'tag_name' => '1.0.0', 'html_url' => 'https://github.com/owner/repo/releases/tag/1.0.0', 'created_at' => '2026-01-01T00:00:00Z'],
-            ])),
+            ])), // releases
         );
         $command = new ListReleases(new Client($guzzleClient), new Resolver(new Config(), cwd: __DIR__));
         $commandTester = new CommandTester($command);
