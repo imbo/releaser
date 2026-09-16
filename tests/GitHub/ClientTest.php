@@ -558,17 +558,30 @@ class ClientTest extends TestCase
         $this->assertSame(2, $pullRequests[0]->number);
     }
 
-    public function testDeleteRelease(): void
+    /**
+     * @return iterable<string,array{tagName:string,encodedName:string}>
+     */
+    public static function tagNameProvider(): iterable
+    {
+        yield 'plain version' => ['tagName' => '1.0.0', 'encodedName' => '1.0.0'];
+        yield 'fragment' => ['tagName' => 'v1.2.3#v4.5.6', 'encodedName' => 'v1.2.3%23v4.5.6'];
+        yield 'literal percent sequence' => ['tagName' => 'release%231.2.3', 'encodedName' => 'release%25231.2.3'];
+        yield 'reserved characters' => ['tagName' => 'release/one+two&x=1-v1.2.3', 'encodedName' => 'release%2Fone%2Btwo%26x%3D1-v1.2.3'];
+    }
+
+    #[DataProvider('tagNameProvider')]
+    public function testDeleteRelease(string $tagName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => '1.0.0'])),
+            new Response(200, [], $this->json(['id' => 12_345, 'tag_name' => $tagName])),
             new Response(204),
         );
 
-        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+        (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString($tagName));
 
         $this->assertCount(2, $history);
-        $this->assertSame('/repos/owner/repo/releases/tags/1.0.0', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/releases/tags/'.$encodedName, (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/releases/tags/'.$tagName, rawurldecode($history[0]['request']->getUri()->getPath()));
         $this->assertSame('GET', $history[0]['request']->getMethod());
         $this->assertSame('/repos/owner/repo/releases/12345', (string) $history[1]['request']->getUri());
         $this->assertSame('DELETE', $history[1]['request']->getMethod());
@@ -608,16 +621,18 @@ class ClientTest extends TestCase
         (new Client($guzzleClient))->deleteRelease(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
     }
 
-    public function testDeleteTag(): void
+    #[DataProvider('tagNameProvider')]
+    public function testDeleteTag(string $tagName, string $encodedName): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(204),
         );
 
-        (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+        (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString($tagName));
 
         $this->assertCount(1, $history);
-        $this->assertSame('/repos/owner/repo/git/refs/tags/1.0.0', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/'.$encodedName, (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/git/refs/tags/'.$tagName, rawurldecode($history[0]['request']->getUri()->getPath()));
         $this->assertSame('DELETE', $history[0]['request']->getMethod());
     }
 

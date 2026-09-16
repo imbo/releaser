@@ -166,8 +166,8 @@ class DeleteRelease extends BaseCommand
 
         $question = new ConfirmationQuestion(
             $tagOnly
-                ? sprintf('You are about to delete Git tag "%s". Do you want to continue? (y/N)', $version)
-                : sprintf('You are about to delete release "%s" and its associated Git tag. Do you want to continue? (y/N)', $version),
+                ? sprintf('You are about to delete Git tag "%s" from repository "%s". Do you want to continue? (y/N)', $version, $repository)
+                : sprintf('You are about to delete release "%s" and its associated Git tag from repository "%s". Do you want to continue? (y/N)', $version, $repository),
             false,
         );
         if ($input->isInteractive() && !(new QuestionHelper())->ask($input, $output, $question)) {
@@ -185,7 +185,7 @@ class DeleteRelease extends BaseCommand
             $this->gitHubClient->deleteTag($repository, $version);
         } catch (RuntimeException $e) {
             if (!$tagOnly) {
-                throw new RuntimeException(sprintf('Failed to delete tag "%s" after deleting its GitHub release. The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only %s', $version, $version), previous: $e);
+                throw new RuntimeException(sprintf('Failed to delete tag "%s" after deleting its GitHub release. The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only -- %s', $version, escapeshellarg((string) $version)), previous: $e);
             }
 
             throw $e;
