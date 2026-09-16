@@ -4,23 +4,36 @@ namespace ImboReleaser\Tests\GitHub;
 
 use ImboReleaser\GitHub\TokenResolver;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
+use function dirname;
 use function file_put_contents;
-use function sys_get_temp_dir;
 use function unlink;
+
+use const PHP_BINARY;
 
 #[CoversClass(TokenResolver::class)]
 class TokenResolverTest extends TestCase
 {
     private string $tmpDir;
+    /** @var array<mixed> */
+    private array $originalServer;
+    /** @var array<mixed> */
+    private array $originalEnv;
+    private string|false $originalToken;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/tokenresolver_test';
-        if (!is_dir($this->tmpDir)) {
-            mkdir($this->tmpDir);
-        }
+        $this->originalServer = $_SERVER;
+        $this->originalEnv = $_ENV;
+        $this->originalToken = getenv('GITHUB_TOKEN');
+        unset($_SERVER['GITHUB_TOKEN'], $_ENV['GITHUB_TOKEN'], $_SERVER['SYMFONY_DOTENV_VARS'], $_ENV['SYMFONY_DOTENV_VARS']);
+        putenv('GITHUB_TOKEN');
+
+        $this->tmpDir = __DIR__.'/tokenresolver_'.bin2hex(random_bytes(8));
+        mkdir($this->tmpDir);
     }
 
     protected function tearDown(): void
@@ -30,7 +43,11 @@ class TokenResolverTest extends TestCase
             unlink($envFile);
         }
 
-        unset($_SERVER['GITHUB_TOKEN'], $_ENV['GITHUB_TOKEN']);
+        rmdir($this->tmpDir);
+
+        $_SERVER = $this->originalServer;
+        $_ENV = $this->originalEnv;
+        putenv(false === $this->originalToken ? 'GITHUB_TOKEN' : 'GITHUB_TOKEN='.$this->originalToken);
     }
 
     public function testResolvesFromEnvFile(): void
@@ -44,6 +61,8 @@ class TokenResolverTest extends TestCase
 
     public function testResolvesFromServer(): void
     {
+        file_put_contents($this->tmpDir.'/.env', "GITHUB_TOKEN=env-file-token\n");
+        putenv('GITHUB_TOKEN=process-token');
         $_SERVER['GITHUB_TOKEN'] = 'server-token';
         $_ENV['GITHUB_TOKEN'] = 'env-token';
 
@@ -53,11 +72,75 @@ class TokenResolverTest extends TestCase
 
     public function testResolvesFromEnv(): void
     {
-        unset($_SERVER['GITHUB_TOKEN']);
+        file_put_contents($this->tmpDir.'/.env', "GITHUB_TOKEN=env-file-token\n");
+        putenv('GITHUB_TOKEN=process-token');
         $_ENV['GITHUB_TOKEN'] = 'env-token';
 
         $resolver = new TokenResolver($this->tmpDir);
         $this->assertSame('env-token', $resolver->getGitHubToken());
+    }
+
+    public function testResolvesFromProcessEnvironmentBeforeEnvFile(): void
+    {
+        putenv('GITHUB_TOKEN=process-token');
+        file_put_contents($this->tmpDir.'/.env', "GITHUB_TOKEN=env-file-token\n");
+
+        $resolver = $this->tokenResolver('github-cli-token');
+        $this->assertSame('process-token', $resolver->getGitHubToken());
+        $this->assertSame('process-token', $resolver->getGitHubToken());
+    }
+
+    /**
+     * @return iterable<string,array{string|false,bool,string}>
+     */
+    public static function processEnvironmentProvider(): iterable
+    {
+        yield 'exported token' => ['process-token', false, 'process-token'];
+        yield 'exported token beats file' => ['process-token', true, 'process-token'];
+        yield 'zero is a token' => ['0', true, '0'];
+        yield 'file without exported token' => [false, true, 'env-file-token'];
+        yield 'CLI without token' => [false, false, 'github-cli-token'];
+        yield 'empty exported token' => ['', false, 'github-cli-token'];
+        yield 'empty exported token suppresses file' => ['', true, 'github-cli-token'];
+    }
+
+    #[DataProvider('processEnvironmentProvider')]
+    public function testResolvesWithSuperglobalsDisabled(string|false $token, bool $envFile, string $expected): void
+    {
+        if ($envFile) {
+            file_put_contents($this->tmpDir.'/.env', "GITHUB_TOKEN=env-file-token\n");
+        }
+
+        $code = <<<'PHP'
+        require $argv[1];
+        if (isset($_SERVER['GITHUB_TOKEN']) || isset($_ENV['GITHUB_TOKEN'])) {
+            exit(1);
+        }
+        $resolver = new ImboReleaser\GitHub\TokenResolver(
+            $argv[2],
+            static fn (): string => "github-cli-token\n",
+        );
+        for ($i = 0; $i < 2; ++$i) {
+            if ($resolver->getGitHubToken() !== $argv[3]) {
+                exit(2);
+            }
+        }
+        PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-d',
+            'variables_order=GPC',
+            '-r',
+            $code,
+            dirname(__DIR__, 2).'/vendor/autoload.php',
+            $this->tmpDir,
+            $expected,
+        ], $this->tmpDir, ['GITHUB_TOKEN' => $token, 'SYMFONY_DOTENV_VARS' => false]);
+        $process->run();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertSame('', $process->getOutput());
     }
 
     public function testResolvesFromGitHubCli(): void
