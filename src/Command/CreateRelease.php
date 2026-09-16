@@ -184,13 +184,20 @@ class CreateRelease extends BaseCommand
         /** @var string */
         $template = $input->getOption('template');
         if (!is_file($template) || !is_readable($template)) {
-            throw new InvalidArgumentException(sprintf('The specified template file "%s" does not exist or is not readable.', $template));
+            throw new InvalidArgumentException(sprintf('The specified template file "%s" does not exist or is not readable.', $template), self::INVALID);
+        }
+
+        /** @var ?string */
+        $prereleaseIdentifier = $input->getOption('prerelease');
+        if (null !== $prereleaseIdentifier) {
+            try {
+                (new Version())->withPrerelease($prereleaseIdentifier, 1);
+            } catch (InvalidArgumentException $e) {
+                throw new InvalidArgumentException($e->getMessage(), self::INVALID, $e);
+            }
         }
 
         $pullRequests = $this->getMergedPullRequests($branch, $repository, $output);
-        if ([] === $pullRequests) {
-            throw new RuntimeException('No pull requests found, aborting release. Either add pull requests, or override the filterPullRequest method in your config.');
-        }
 
         $allTags = $this->getTags($repository, $output);
         $tags = array_values(array_filter($allTags, $this->config->filterTag(...)));
@@ -202,7 +209,13 @@ class CreateRelease extends BaseCommand
             $commitShas = array_fill_keys(iterator_to_array($this->gitHubClient->getCommitShasBetween($repository, $tag->sha, $branch->name)), true);
             $pullRequestsInRelease = [];
             foreach ($pullRequests as $pullRequest) {
-                if (null === $pullRequest->mergeCommitSha || !isset($commitShas[$pullRequest->mergeCommitSha])) {
+                if (null === $pullRequest->mergeCommitSha) {
+                    $output->writeln(sprintf('Skipping pull request #%d: GitHub did not provide a merge commit ID.', $pullRequest->number), OutputInterface::VERBOSITY_VERBOSE);
+                    continue;
+                }
+
+                if (!isset($commitShas[$pullRequest->mergeCommitSha])) {
+                    $output->writeln(sprintf('Skipping pull request #%d: its merge commit is not in the changes since tag "%s".', $pullRequest->number, $tag->name), OutputInterface::VERBOSITY_VERBOSE);
                     continue;
                 }
 
@@ -210,14 +223,12 @@ class CreateRelease extends BaseCommand
             }
 
             if ([] === $pullRequestsInRelease) {
-                throw new RuntimeException('No pull requests found for the release. You need to merge pull requests before creating a release.');
+                throw new RuntimeException(sprintf('No eligible pull requests match the changes since tag "%s" on branch "%s". Run with -v to see why pull requests were skipped.', $tag->name, $branch->name));
             }
 
             $nextVersion = $this->config->determineNextVersion($tag, $pullRequestsInRelease);
         }
 
-        /** @var ?string */
-        $prereleaseIdentifier = $input->getOption('prerelease');
         if (null !== $prereleaseIdentifier) {
             $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $allTags);
         }
@@ -361,7 +372,7 @@ class CreateRelease extends BaseCommand
             /** @var Branch */
             return (new QuestionHelper())->ask($input, $output, $question);
         } catch (Throwable $e) {
-            throw new InvalidArgumentException($e->getMessage(), previous: $e);
+            throw new InvalidArgumentException($e->getMessage(), self::INVALID, $e);
         }
     }
 
@@ -413,6 +424,8 @@ class CreateRelease extends BaseCommand
      * The returned pull requests are sorted by creation date in descending order.
      *
      * @return list<ReleasePullRequest>
+     *
+     * @throws RuntimeException
      */
     private function getMergedPullRequests(Branch $branch, Repository $repository, OutputInterface $output): array
     {
@@ -420,15 +433,19 @@ class CreateRelease extends BaseCommand
         $progress->start('Fetching pull requests...');
 
         $pullRequests = [];
+        $mergedCount = 0;
         foreach ($this->gitHubClient->getMergedPullRequests($branch, $repository) as $pullRequest) {
+            ++$mergedCount;
             $progress->advance();
             try {
                 $releasePullRequest = ReleasePullRequest::fromPullRequest($pullRequest);
             } catch (InvalidArgumentException) {
+                $output->writeln(sprintf('Skipping pull request #%d: its title or body is not a valid Conventional Commit message.', $pullRequest->number), OutputInterface::VERBOSITY_VERBOSE);
                 continue;
             }
 
             if (!$this->config->filterPullRequest($releasePullRequest)) {
+                $output->writeln(sprintf('Skipping pull request #%d: excluded by filterPullRequest() in the configuration.', $pullRequest->number), OutputInterface::VERBOSITY_VERBOSE);
                 continue;
             }
 
@@ -436,6 +453,14 @@ class CreateRelease extends BaseCommand
         }
 
         $progress->finish('Fetched pull requests');
+
+        if (0 === $mergedCount) {
+            throw new RuntimeException(sprintf('No merged pull requests were returned for branch "%s" in repository "%s". Merge a pull request into this branch before creating a release.', $branch->name, $repository));
+        }
+
+        if ([] === $pullRequests) {
+            throw new RuntimeException('No eligible pull requests remain: all were excluded by the configuration or have invalid Conventional Commit messages. Run with -v to see why each pull request was skipped.');
+        }
 
         return $pullRequests;
     }

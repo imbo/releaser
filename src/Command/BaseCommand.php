@@ -119,7 +119,11 @@ abstract class BaseCommand extends Command
     {
         /** @var ?string */
         $configFile = $input->getOption('config');
-        $this->config = $this->configResolver->getConfig($configFile);
+        try {
+            $this->config = $this->configResolver->getConfig($configFile);
+        } catch (InvalidArgumentException $e) {
+            throw new InvalidArgumentException($e->getMessage(), self::INVALID, $e);
+        }
 
         $configFilePath = $this->configResolver->configFilePath();
         if (null !== $configFilePath) {
@@ -159,7 +163,11 @@ abstract class BaseCommand extends Command
             throw new InvalidArgumentException('Specify a GitHub repository using the -r|--repository option or override the gitHubRepository() method in your config.', self::INVALID);
         }
 
-        return Repository::fromString($name);
+        try {
+            return Repository::fromString($name);
+        } catch (InvalidArgumentException $e) {
+            throw new InvalidArgumentException($e->getMessage(), self::INVALID, $e);
+        }
     }
 
     /**
@@ -173,7 +181,7 @@ abstract class BaseCommand extends Command
             (new Question('Specify the repository (owner/repo): '))
             ->setValidator(static function ($answer): string {
                 if (!is_string($answer) || !Repository::isValid($answer)) {
-                    throw new InvalidArgumentException('The repository must be in the format "owner/repo".');
+                    throw new InvalidArgumentException('The repository must be in the format "owner/repo".', self::INVALID);
                 }
 
                 return $answer;

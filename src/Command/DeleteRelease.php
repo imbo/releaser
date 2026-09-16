@@ -132,7 +132,7 @@ class DeleteRelease extends BaseCommand
             /** @var Release */
             return (new QuestionHelper())->ask($input, $output, $question);
         } catch (Throwable $e) {
-            throw new InvalidArgumentException($e->getMessage(), previous: $e);
+            throw new InvalidArgumentException($e->getMessage(), self::INVALID, $e);
         }
     }
 
@@ -156,7 +156,7 @@ class DeleteRelease extends BaseCommand
         try {
             $version = Version::fromString($versionArg);
         } catch (InvalidArgumentException $e) {
-            throw new RuntimeException(sprintf('Invalid version "%s": %s', $versionArg, $e->getMessage()), previous: $e);
+            throw new InvalidArgumentException(sprintf('Invalid version "%s": %s', $versionArg, $e->getMessage()), self::INVALID, $e);
         }
 
         /** @var bool */

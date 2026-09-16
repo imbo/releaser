@@ -25,7 +25,7 @@ class DeleteReleaseTest extends TestCase
         [$guzzleClient] = $this->getGuzzleClient();
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
-        $this->expectException(RuntimeException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid version "not-a-version"');
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => 'not-a-version'], ['interactive' => false]);
     }
@@ -36,7 +36,7 @@ class DeleteReleaseTest extends TestCase
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid version "01.2.3"');
         try {
             $commandTester->execute(['--repository' => 'owner/repo', 'version' => '01.2.3'], ['interactive' => false]);
