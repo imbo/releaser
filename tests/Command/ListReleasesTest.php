@@ -34,7 +34,7 @@ class ListReleasesTest extends TestCase
         $commandTester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
 
         $this->assertSame(ListReleases::SUCCESS, $commandTester->getStatusCode());
-        $this->assertStringContainsString('No releases found for the repository.', $commandTester->getDisplay());
+        $this->assertStringContainsString('No releases with supported version tags found in repository "owner/repo".', $commandTester->getDisplay());
     }
 
     public function testReportsResolvedConfigurationFile(): void
@@ -97,6 +97,21 @@ class ListReleasesTest extends TestCase
         $this->assertCount(1, $history);
         $this->assertSame('GET', $history[0]['request']->getMethod());
         $this->assertSame('/repos/owner/repo/releases', $history[0]['request']->getUri()->getPath());
+    }
+
+    public function testNoSupportedVersionTags(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'name' => 'Nightly', 'tag_name' => 'nightly',
+                'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+            ]])), // releases
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute(['--repository' => 'owner/repo'], ['interactive' => false]);
+
+        $this->assertSame(ListReleases::SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('No releases with supported version tags found in repository "owner/repo".', $tester->getDisplay());
     }
 
     public function testSelectValidRepository(): void

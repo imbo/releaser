@@ -115,7 +115,7 @@ imbo-releaser create --repository owner/repo --branch main --name "Version 1.3"
 imbo-releaser list --help
 ```
 
-This command prints a table of the existing releases in the repository, including the release name, tag name, and publication date, with the most recently published releases first. The date is when the release was published on GitHub, rather than when its commit was created.
+This command lists releases whose tags match the supported version format, including prereleases and custom prefixes such as `1.2.3`, `v1.2.3-rc.1`, and `release-1.2.3`. Releases with tags such as `nightly` are not listed. The table includes the release name, tag name, and publication date, with the most recently published releases first. The date is when the release was published on GitHub, rather than when its commit was created.
 
 Releases with no publication date show `Unknown` after dated releases. Drafts show `Draft` and appear last. Entries with the same date, unknown dates, or draft status are ordered alphabetically by tag name.
 
@@ -128,6 +128,8 @@ imbo-releaser delete --help
 ```
 
 This command deletes a GitHub release and its associated Git tag. If no version is given, you are prompted to select a release to delete.
+
+Both the version argument and the selection list use the same supported version tags as `list`, including prereleases and custom prefixes. Tags such as `nightly` are not supported, including when using `--tag-only`. Supply the exact tag name, including any prefix.
 
 Draft releases are supported too: supply their tag name as the version or select them from the list. Your token must have access to the draft.
 

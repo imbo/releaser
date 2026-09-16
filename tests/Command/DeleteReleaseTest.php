@@ -291,7 +291,7 @@ class DeleteReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo']);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No releases found for repository');
+        $this->expectExceptionMessage('No releases with supported version tags found in repository "owner/repo".');
         $commandTester->execute([]);
     }
 
@@ -341,7 +341,7 @@ class DeleteReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->setInputs(['owner/repo']);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No releases found for repository');
+        $this->expectExceptionMessage('No releases with supported version tags found in repository "owner/repo".');
         $commandTester->execute([]);
     }
 
