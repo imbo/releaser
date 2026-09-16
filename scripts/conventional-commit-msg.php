@@ -49,7 +49,7 @@ if (is_file($input)) {
 }
 
 try {
-    (new Parser())->parse($input);
+    $message = (new Parser())->parse($input);
 } catch (InvalidCommitMessage $e) {
     fwrite(STDERR, <<<EOF
     Invalid Conventional Commit message:
@@ -65,5 +65,11 @@ try {
     - https://www.conventionalcommits.org/en/v1.0.0/#summary
 
     EOF);
+    exit(1);
+}
+
+$type = $message->getType()->toString();
+if ($type !== strtolower($type)) {
+    fwrite(STDERR, 'Use a lowercase Conventional Commit type, such as feat, fix, or docs.'.PHP_EOL);
     exit(1);
 }

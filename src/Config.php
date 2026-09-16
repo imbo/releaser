@@ -72,7 +72,7 @@ class Config implements ConfigInterface
                 break;
             }
 
-            if ('feat' === $pullRequest->message->getType()->toString()) {
+            if ('feat' === strtolower($pullRequest->message->getType()->toString())) {
                 $hasFeature = true;
             }
         }

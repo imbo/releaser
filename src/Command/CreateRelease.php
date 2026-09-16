@@ -451,13 +451,13 @@ class CreateRelease extends BaseCommand
         $groupsByType = [];
         foreach ($groups as $name => $types) {
             foreach ($types as $type) {
-                $groupsByType[$type] = $name;
+                $groupsByType[strtolower($type)] = $name;
             }
         }
 
         $groupedPullRequests = array_fill_keys([...array_keys($groups), $fallbackGroup], []);
         foreach ($pullRequests as $pullRequest) {
-            $type = $pullRequest->message->getType()->toString();
+            $type = strtolower($pullRequest->message->getType()->toString());
             $groupedPullRequests[$groupsByType[$type] ?? $fallbackGroup][] = $pullRequest;
         }
 

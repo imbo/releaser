@@ -37,6 +37,8 @@ The key points regarding how Imbo Releaser works out of the box are as follows:
 - Git branches are named `main` or `master` (for development of the latest major version), and `X.x` (e.g. `1.x`) or `X.Y.x` (e.g. `1.2.x`) for maintenance releases. Maintenance branches may contain an optional `v` prefix (e.g. `v1.x` or `v1.2.x`), and do not have to include the `.x` suffix (e.g. `v1` or `v1.2`).
 - Git tags are named `X.Y.Z` (e.g. `1.0.0`). Tags may also contain an optional `v` prefix (e.g. `v1.0.0`).
 - Only pull requests are used when generating release notes and calculating the next version to release. Commits pushed directly to branches are ignored. The pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+  Types are matched case-insensitively: `feat:`, `Feat:`, and `FEAT:` have the same effect on version calculation and release-note grouping. The `BREAKING CHANGE` footer must remain uppercase.
 - Release notes are attached to the GitHub release and annotated tags, and are not committed to the repository.
 - It does all repository operations using the GitHub API, and not using a local checkout of your repository.
 

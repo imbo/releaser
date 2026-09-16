@@ -66,6 +66,8 @@ public function testSomething(): void
 
 ## Conventional commits
 
+Use lowercase types such as `feat:`, `fix:`, and `docs:`. The PR-title check and commit-message hook reject uppercase or mixed-case types. This project rule is stricter than the Conventional Commits specification; it does not restrict the casing of scopes or descriptions. Use uppercase `BREAKING CHANGE` for breaking-change footers.
+
 Use [conventional commits](https://www.conventionalcommits.org/) for all commits and pull request titles. When a pull request is merged it will be squashed. There is a `commit-msg` Git hook script that you can use to validate your commits locally. Enable the script by running the following command:
 
     ln -s ../../scripts/conventional-commit-msg.php .git/hooks/commit-msg

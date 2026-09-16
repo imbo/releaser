@@ -136,6 +136,9 @@ class ConfigTest extends TestCase
      */
     public static function determineNextVersionProvider(): iterable
     {
+        yield 'uppercase feature' => ['current' => '1.0.0', 'titles' => ['FEAT: a feature'], 'expected' => '1.1.0'];
+        yield 'mixed-case feature' => ['current' => '1.0.0', 'titles' => ['Feat: a feature'], 'expected' => '1.1.0'];
+        yield 'uppercase breaking change' => ['current' => '1.0.0', 'titles' => ['FIX(API)!: a breaking change'], 'expected' => '2.0.0'];
         yield 'patch changes' => [
             'current' => '1.0.0',
             'titles' => ['fix: some bug'],
