@@ -2,6 +2,7 @@
 
 namespace ImboReleaser\GitHub;
 
+use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -59,6 +60,20 @@ class ReleaseTest extends TestCase
             ],
             'error' => 'Invalid "created_at" value: not-a-date',
         ];
+
+        $data = ['name' => 'release name', 'tag_name' => 'v1.0.0', 'html_url' => '<release-url>', 'created_at' => '2024-01-01T00:00:00Z'];
+        foreach ([123, [], '', '   ', 'not-a-date'] as $index => $publishedAt) {
+            yield 'invalid published_at '.$index => [
+                'data' => [...$data, 'published_at' => $publishedAt],
+                'error' => 'Invalid "published_at" value',
+            ];
+        }
+        foreach ([null, 1, 'false'] as $index => $draft) {
+            yield 'invalid draft '.$index => [
+                'data' => [...$data, 'draft' => $draft],
+                'error' => 'Invalid "draft" value',
+            ];
+        }
     }
 
     /**
@@ -75,9 +90,39 @@ class ReleaseTest extends TestCase
     public function testFromAPIWithValidData(): void
     {
         $url = 'https://github.com/owner/repo/releases/tag/v1.0.0';
-        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.1.1', 'html_url' => $url, 'created_at' => '2024-01-01T00:00:00Z']);
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.1.1', 'html_url' => $url, 'created_at' => '2024-01-01T00:00:00Z', 'published_at' => '2024-02-01T12:34:56Z', 'draft' => false]);
         $this->assertSame($url, $release->htmlUrl);
         $this->assertSame('release name', $release->name);
+        $this->assertSame('2024-01-01T00:00:00+00:00', $release->createdAt->format('c'));
+        $this->assertSame('2024-02-01T12:34:56+00:00', $release->publishedAt?->format('c'));
+        $this->assertFalse($release->draft);
+    }
+
+    public function testDraftHasNoPublicationDate(): void
+    {
+        $release = Release::fromAPI(['name' => 'Draft release', 'tag_name' => 'v1.1.1', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z', 'published_at' => null, 'draft' => true]);
+
+        $this->assertNull($release->publishedAt);
+        $this->assertTrue($release->draft);
+        $this->assertSame('2024-01-01T00:00:00+00:00', $release->createdAt->format('c'));
+    }
+
+    public function testMissingPublicationDataDoesNotUseCommitDate(): void
+    {
+        $release = Release::fromAPI(['name' => 'release name', 'tag_name' => 'v1.1.1', 'html_url' => 'url', 'created_at' => '2024-01-01T00:00:00Z']);
+
+        $this->assertNull($release->publishedAt);
+        $this->assertFalse($release->draft);
+    }
+
+    public function testConstructorAcceptsOriginalFourArguments(): void
+    {
+        $createdAt = new DateTimeImmutable('2024-01-01T00:00:00Z');
+        $release = new Release('release name', 'v1.1.1', 'url', $createdAt);
+
+        $this->assertSame($createdAt, $release->createdAt);
+        $this->assertNull($release->publishedAt);
+        $this->assertFalse($release->draft);
     }
 
     public function testFromAPIWithNullName(): void

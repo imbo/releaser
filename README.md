@@ -111,7 +111,9 @@ imbo-releaser create --repository owner/repo --branch main --name "Version 1.3"
 imbo-releaser list --help
 ```
 
-This command prints a table of the existing releases in the repository, including the release name, tag name, and release date, with the newest releases first.
+This command prints a table of the existing releases in the repository, including the release name, tag name, and publication date, with the most recently published releases first. The date is when the release was published on GitHub, rather than when its commit was created.
+
+Releases with no publication date show `Unknown` after dated releases. Drafts show `Draft` and appear last. Entries with the same date, unknown dates, or draft status are ordered alphabetically by tag name.
 
 Releases without a name are displayed using their tag name.
 

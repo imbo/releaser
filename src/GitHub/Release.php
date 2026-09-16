@@ -9,16 +9,24 @@ use ImboReleaser\Version;
 use Stringable;
 
 use function array_key_exists;
+use function is_bool;
 use function is_string;
 use function sprintf;
+use function trim;
 use function var_export;
 
 final class Release implements Stringable
 {
     public readonly ?Version $version;
 
-    public function __construct(public readonly string $name, public readonly string $tagName, public readonly string $htmlUrl, public readonly DateTimeImmutable $createdAt)
-    {
+    public function __construct(
+        public readonly string $name,
+        public readonly string $tagName,
+        public readonly string $htmlUrl,
+        public readonly DateTimeImmutable $createdAt,
+        public readonly ?DateTimeImmutable $publishedAt = null,
+        public readonly bool $draft = false,
+    ) {
         try {
             $this->version = Version::fromString($this->tagName);
         } catch (InvalidArgumentException) {
@@ -72,6 +80,25 @@ final class Release implements Stringable
             throw new InvalidArgumentException(sprintf('Invalid "created_at" value: %s', $createdAt), previous: $e);
         }
 
-        return new self($name ?? $tagName, $tagName, $htmlUrl, $createdAtDateTime);
+        $publishedAt = $data['published_at'] ?? null;
+        $publishedAtDateTime = null;
+        if (null !== $publishedAt) {
+            if (!is_string($publishedAt) || '' === trim($publishedAt)) {
+                throw new InvalidArgumentException(sprintf('Invalid "published_at" value: %s', var_export($publishedAt, true)));
+            }
+
+            try {
+                $publishedAtDateTime = new DateTimeImmutable($publishedAt);
+            } catch (DateMalformedStringException $e) {
+                throw new InvalidArgumentException(sprintf('Invalid "published_at" value: %s', $publishedAt), previous: $e);
+            }
+        }
+
+        $draft = array_key_exists('draft', $data) ? $data['draft'] : false;
+        if (!is_bool($draft)) {
+            throw new InvalidArgumentException(sprintf('Invalid "draft" value: %s', var_export($draft, true)));
+        }
+
+        return new self($name ?? $tagName, $tagName, $htmlUrl, $createdAtDateTime, $publishedAtDateTime, $draft);
     }
 }
