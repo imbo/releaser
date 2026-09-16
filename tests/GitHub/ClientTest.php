@@ -563,6 +563,7 @@ class ClientTest extends TestCase
      */
     public static function tagNameProvider(): iterable
     {
+        yield 'build metadata' => ['tagName' => 'v1.2.3+build.4.5.6', 'encodedName' => 'v1.2.3%2Bbuild.4.5.6'];
         yield 'plain version' => ['tagName' => '1.0.0', 'encodedName' => '1.0.0'];
         yield 'fragment' => ['tagName' => 'v1.2.3#v4.5.6', 'encodedName' => 'v1.2.3%23v4.5.6'];
         yield 'literal percent sequence' => ['tagName' => 'release%231.2.3', 'encodedName' => 'release%25231.2.3'];

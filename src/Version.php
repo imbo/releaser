@@ -19,12 +19,13 @@ final class Version implements Stringable
         private int $minor = 0,
         private int $patch = 0,
         private ?string $prerelease = null,
+        private ?string $buildMetadata = null,
     ) {
     }
 
     public function __toString(): string
     {
-        return ($this->prefix ?? '').$this->major.'.'.$this->minor.'.'.$this->patch.(null !== $this->prerelease ? '-'.$this->prerelease : '');
+        return ($this->prefix ?? '').$this->major.'.'.$this->minor.'.'.$this->patch.(null !== $this->prerelease ? '-'.$this->prerelease : '').(null !== $this->buildMetadata ? '+'.$this->buildMetadata : '');
     }
 
     public function incrementMajor(): self
@@ -45,7 +46,7 @@ final class Version implements Stringable
     /**
      * Compare the major, minor, and patch numbers to another version.
      *
-     * Prefixes and prerelease suffixes are ignored, so v1.2.3-rc.1 and 1.2.3 compare as equal.
+     * Prefixes, prerelease suffixes, and build metadata are ignored, so v1.2.3-rc.1 and 1.2.3 compare as equal.
      * This is not a full SemVer precedence comparison.
      *
      * Returns Version::LOWER if this version is lower than the other version, Version::EQUAL if
@@ -69,7 +70,7 @@ final class Version implements Stringable
             throw new InvalidArgumentException(sprintf('Invalid prerelease identifier or number: "%s.%d"', $identifier, $number));
         }
 
-        return new self($this->prefix, $this->major, $this->minor, $this->patch, $identifier.'.'.$number);
+        return new self($this->prefix, $this->major, $this->minor, $this->patch, $identifier.'.'.$number, $this->buildMetadata);
     }
 
     public function isPrerelease(): bool
@@ -93,7 +94,17 @@ final class Version implements Stringable
      */
     public static function fromString(string $version): self
     {
-        if (!preg_match('/^(?P<prefix>\S*?[^\d\s])?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/D', $version, $matches)) {
+        $versionWithoutMetadata = $version;
+        $buildMetadata = null;
+        if (preg_match('/^(.*?\d+\.\d+\.\d+[^+]*?)\+(.*)$/Ds', $version, $metadata)) {
+            $versionWithoutMetadata = $metadata[1];
+            $buildMetadata = $metadata[2];
+            if (!preg_match('/^[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$/D', $buildMetadata)) {
+                throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
+            }
+        }
+
+        if (!preg_match('/^(?P<prefix>\S*?[^\d\s])?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/D', $versionWithoutMetadata, $matches)) {
             throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
         }
 
@@ -108,6 +119,7 @@ final class Version implements Stringable
             (int) $matches['minor'],
             (int) $matches['patch'],
             '' !== ($matches['prerelease'] ?? '') ? $matches['prerelease'] : null,
+            $buildMetadata,
         );
     }
 }

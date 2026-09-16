@@ -194,6 +194,11 @@ class ConfigTest extends TestCase
      */
     public static function getLatestTagForBranchProvider(): iterable
     {
+        yield 'build metadata does not change version ordering' => [
+            'branchName' => 'main',
+            'tagNames' => ['v1.2.3+build.4.5.6', 'v2.0.0'],
+            'expectedTagName' => 'v2.0.0',
+        ];
         yield 'no tags' => [
             'branchName' => 'main',
             'tagNames' => [],

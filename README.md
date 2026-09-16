@@ -42,6 +42,8 @@ The key points regarding how Imbo Releaser works out of the box are as follows:
 
 Release tags must end in a semantic version such as `1.2.3` or `v1.2.3`; other Git tags are ignored. Other tag prefixes are supported. Override `filterTag()` to exclude release tags and, when using maintenance branches, override `getLatestTagForBranch()` to define how the prefix maps to a branch.
 
+Tags may include build metadata, such as `v1.2.3+build.4.5.6`. It is preserved when listing or deleting a release but does not affect version ordering. Increasing the major, minor, or patch version drops the previous build metadata.
+
 If reading from GitHub fails because of a connection problem, temporary server error, or rate limit, Imbo Releaser retries up to three times. It waits as instructed by GitHub, up to one minute. If GitHub requires a longer wait, the command fails so you can try again later.
 
 Once installed you can see the available commands and documentation by running the `imbo-releaser` script.
