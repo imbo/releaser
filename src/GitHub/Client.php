@@ -208,7 +208,7 @@ final class Client
     }
 
     /**
-     * Delete a GitHub release and its associated Git tag.
+     * Delete a GitHub release, leaving its associated Git tag in place.
      *
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#get-a-release-by-tag-name
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#delete-a-release

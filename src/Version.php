@@ -43,7 +43,10 @@ final class Version implements Stringable
     }
 
     /**
-     * Compare this version to another version.
+     * Compare the major, minor, and patch numbers to another version.
+     *
+     * Prefixes and prerelease suffixes are ignored, so v1.2.3-rc.1 and 1.2.3 compare as equal.
+     * This is not a full SemVer precedence comparison.
      *
      * Returns Version::LOWER if this version is lower than the other version, Version::EQUAL if
      * they are equal, and Version::GREATER if this version is greater than the other version.

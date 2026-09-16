@@ -74,4 +74,4 @@ Use [conventional commits](https://www.conventionalcommits.org/) for all commits
 
 Remember to install the dependencies first, otherwise the hook will not work. You can also run the script manually to validate your commit message:
 
-    php scripts/conventional-commit-msg.php <commit message>
+    php scripts/conventional-commit-msg.php "feat: add an export command"
