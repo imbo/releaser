@@ -136,14 +136,22 @@ class RetryTest extends TestCase
     {
         yield '5 seconds' => ['headerValue' => '5', 'expectedMs' => 5_000];
         yield '30 seconds' => ['headerValue' => '30', 'expectedMs' => 30_000];
-        yield 'capped at max delay' => ['headerValue' => '120', 'expectedMs' => 60_000];
-        yield 'non-numeric falls back to backoff' => ['headerValue' => 'invalid', 'expectedMs' => 1_000];
+        yield 'zero seconds' => ['headerValue' => '0', 'expectedMs' => 0];
+        yield 'one minute' => ['headerValue' => '60', 'expectedMs' => 60_000];
+        yield 'invalid' => ['headerValue' => 'invalid', 'expectedMs' => 60_000];
+        yield 'negative' => ['headerValue' => '-5', 'expectedMs' => 60_000];
+        yield 'fractional' => ['headerValue' => '0.5', 'expectedMs' => 60_000];
+        yield 'scientific notation' => ['headerValue' => '1e1', 'expectedMs' => 60_000];
+        yield 'relative date' => ['headerValue' => 'tomorrow', 'expectedMs' => 60_000];
+        yield 'invalid calendar date' => ['headerValue' => 'Mon, 31 Feb 2031 00:00:00 GMT', 'expectedMs' => 60_000];
+        yield 'past HTTP date' => ['headerValue' => 'Wed, 21 Oct 2015 07:28:00 GMT', 'expectedMs' => 0];
     }
 
     #[DataProvider('retryAfterProvider')]
     public function testRetryAfterHeader(string $headerValue, int $expectedMs): void
     {
         $response = new Response(429, ['Retry-After' => $headerValue]);
+        $this->assertTrue($this->retry->decide(0, $this->request, $response, null));
         $this->assertSame($expectedMs, $this->retry->delay(0, $response));
     }
 
@@ -160,40 +168,143 @@ class RetryTest extends TestCase
         $this->assertLessThanOrEqual(10_000, $delayMs);
     }
 
-    /**
-     * @return iterable<string,array{offsetSeconds:int,expectedMs:int}>
-     */
-    public static function rateLimitResetEdgeCaseProvider(): iterable
-    {
-        yield 'reset in the past' => ['offsetSeconds' => -5, 'expectedMs' => 0];
-        yield 'reset far in future (capped)' => ['offsetSeconds' => 300, 'expectedMs' => 60_000];
-    }
-
-    #[DataProvider('rateLimitResetEdgeCaseProvider')]
-    public function testRateLimitResetEdgeCases(int $offsetSeconds, int $expectedMs): void
+    public function testRateLimitResetInThePast(): void
     {
         $response = new Response(403, [
             'X-RateLimit-Remaining' => '0',
-            'X-RateLimit-Reset' => (string) (time() + $offsetSeconds),
+            'X-RateLimit-Reset' => (string) (time() - 5),
         ]);
 
-        $this->assertSame($expectedMs, $this->retry->delay(0, $response));
+        $this->assertSame(0, $this->retry->delay(0, $response));
     }
 
-    public function testIgnoresNonNumericRateLimitReset(): void
+    /**
+     * @return iterable<string,array{headerValue:string}>
+     */
+    public static function invalidRateLimitResetProvider(): iterable
     {
-        $response = new Response(403, ['X-RateLimit-Reset' => 'invalid']);
-        $this->assertSame(1_000, $this->retry->delay(0, $response));
+        yield 'empty' => ['headerValue' => ''];
+        yield 'non-numeric' => ['headerValue' => 'invalid'];
+        yield 'negative' => ['headerValue' => '-5'];
+        yield 'fractional' => ['headerValue' => '123.5'];
+        yield 'scientific notation' => ['headerValue' => '2e9'];
+    }
+
+    #[DataProvider('invalidRateLimitResetProvider')]
+    public function testIgnoresInvalidRateLimitReset(string $headerValue): void
+    {
+        $response = new Response(403, ['X-RateLimit-Remaining' => '0', 'X-RateLimit-Reset' => $headerValue]);
+        $this->assertSame(60_000, $this->retry->delay(1, $response));
     }
 
     public function testRetryAfterTakesPrecedenceOverRateLimitReset(): void
     {
         $response = new Response(403, [
             'Retry-After' => '3',
+            'X-RateLimit-Remaining' => '0',
             'X-RateLimit-Reset' => (string) (time() + 30),
         ]);
 
         $this->assertSame(3_000, $this->retry->delay(0, $response));
+    }
+
+    /**
+     * @return iterable<string,array{timezone:string}>
+     */
+    public static function defaultTimezoneProvider(): iterable
+    {
+        yield 'UTC' => ['timezone' => 'UTC'];
+        yield 'behind UTC' => ['timezone' => 'America/Los_Angeles'];
+        yield 'ahead of UTC' => ['timezone' => 'Asia/Tokyo'];
+    }
+
+    #[DataProvider('defaultTimezoneProvider')]
+    public function testUsesHttpDateRetryAfterRegardlessOfDefaultTimezone(string $timezone): void
+    {
+        $originalTimezone = date_default_timezone_get();
+        date_default_timezone_set($timezone);
+
+        try {
+            $timestamp = time() + 30;
+            $response = new Response(503, ['Retry-After' => gmdate('D, d M Y H:i:s \G\M\T', $timestamp)]);
+
+            $this->assertTrue($this->retry->decide(0, $this->request, $response, null));
+            $before = time();
+            $delay = $this->retry->delay(1, $response);
+            $this->assertGreaterThanOrEqual(max(0, $timestamp - time()) * 1_000, $delay);
+            $this->assertLessThanOrEqual(max(0, $timestamp - $before) * 1_000, $delay);
+        } finally {
+            date_default_timezone_set($originalTimezone);
+        }
+    }
+
+    /**
+     * @return iterable<string,array{response:Response}>
+     */
+    public static function excessiveWaitProvider(): iterable
+    {
+        yield 'Retry-After exceeds budget' => ['response' => new Response(429, ['Retry-After' => '61'])];
+        yield 'server unavailable with Retry-After' => ['response' => new Response(503, ['Retry-After' => '120'])];
+        yield 'Retry-After overflows integer' => ['response' => new Response(429, ['Retry-After' => str_repeat('9', 400)])];
+        yield 'HTTP date exceeds budget' => ['response' => new Response(503, ['Retry-After' => gmdate('D, d M Y H:i:s \G\M\T', time() + 300)])];
+        yield 'exhausted quota resets later' => ['response' => new Response(403, ['X-RateLimit-Remaining' => '0', 'X-RateLimit-Reset' => (string) (time() + 300)])];
+        yield 'reset overflows integer' => ['response' => new Response(429, ['X-RateLimit-Remaining' => '0', 'X-RateLimit-Reset' => str_repeat('9', 400)])];
+    }
+
+    #[DataProvider('excessiveWaitProvider')]
+    public function testDeclinesRetryRatherThanShorteningServerWait(Response $response): void
+    {
+        $this->assertFalse($this->retry->decide(0, $this->request, $response, null));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Required retry delay exceeds one minute');
+        $this->retry->delay(1, $response);
+    }
+
+    /**
+     * @return iterable<string,array{remaining:?string}>
+     */
+    public static function availableQuotaProvider(): iterable
+    {
+        yield 'remaining quota' => ['remaining' => '50'];
+        yield 'missing remaining header' => ['remaining' => null];
+        yield 'malformed remaining header' => ['remaining' => 'invalid'];
+    }
+
+    #[DataProvider('availableQuotaProvider')]
+    public function testServerErrorUsesBackoffUnlessQuotaIsExhausted(?string $remaining): void
+    {
+        $response = new Response(503, ['X-RateLimit-Reset' => (string) (time() + 3_600)]);
+        if (null !== $remaining) {
+            $response = $response->withHeader('X-RateLimit-Remaining', $remaining);
+        }
+
+        $this->assertTrue($this->retry->decide(0, $this->request, $response, null));
+        $this->assertSame(2_000, $this->retry->delay(1, $response));
+        $this->assertSame(4_000, $this->retry->delay(2, $response));
+    }
+
+    public function testMalformedRetryAfterFallsBackToResetForExhaustedQuota(): void
+    {
+        $response = new Response(429, ['Retry-After' => '-1', 'X-RateLimit-Remaining' => '0', 'X-RateLimit-Reset' => '0']);
+
+        $this->assertSame(0, $this->retry->delay(1, $response));
+    }
+
+    public function testMalformedRetryAfterFallsBackToBackoffForServerError(): void
+    {
+        $response = new Response(503, ['Retry-After' => '-1']);
+
+        $this->assertSame(2_000, $this->retry->delay(1, $response));
+    }
+
+    public function testRateLimitWithoutWaitHeaderStopsWhenIncreasingWaitExceedsBudget(): void
+    {
+        $response = new Response(429);
+
+        $this->assertTrue($this->retry->decide(0, $this->request, $response, null));
+        $this->assertSame(60_000, $this->retry->delay(1, $response));
+        $this->assertFalse($this->retry->decide(1, $this->request, $response, null));
     }
 
     public function testFallsBackToBackoffWhenNoRelevantHeaders(): void
