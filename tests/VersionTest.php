@@ -65,6 +65,29 @@ class VersionTest extends TestCase
         $this->assertSame('v1.2.4', (string) $version->incrementPatch());
     }
 
+    public function testBuildMetadataDoesNotAffectVersionNumbers(): void
+    {
+        $version = Version::fromString('v1.2.3+build.4.5.6');
+
+        $this->assertSame('v1.2.3+build.4.5.6', (string) $version);
+        $this->assertSame(Version::EQUAL, $version->compareTo(Version::fromString('v1.2.3')));
+        $this->assertSame(Version::LOWER, $version->compareTo(Version::fromString('v2.0.0')));
+        $this->assertSame('v2.0.0', (string) $version->incrementMajor());
+        $this->assertSame('v1.3.0', (string) $version->incrementMinor());
+        $this->assertSame('v1.2.4', (string) $version->incrementPatch());
+        $this->assertFalse($version->isPrerelease());
+    }
+
+    public function testPrereleaseWithBuildMetadata(): void
+    {
+        $version = Version::fromString('release-1.2.3-rc.2+build.001');
+
+        $this->assertTrue($version->isPrerelease());
+        $this->assertSame(2, $version->prereleaseNumber('rc'));
+        $this->assertSame('release-1.2.3-rc.3+build.001', (string) $version->withPrerelease('rc', 3));
+        $this->assertSame('release-1.2.4', (string) $version->incrementPatch());
+    }
+
     public function testCanCreatePrerelease(): void
     {
         $version = (new Version('v', 1, 2, 3))->withPrerelease('rc', 1);
@@ -159,6 +182,10 @@ class VersionTest extends TestCase
      */
     public static function fromStringProvider(): iterable
     {
+        yield 'build metadata' => ['input' => 'v1.2.3+build.4', 'expected' => 'v1.2.3+build.4'];
+        yield 'numeric build metadata' => ['input' => '1.2.3+001.0', 'expected' => '1.2.3+001.0'];
+        yield 'zero build metadata' => ['input' => 'v1.2.3+0', 'expected' => 'v1.2.3+0'];
+        yield 'prerelease and metadata' => ['input' => 'release-1.2.3-rc.1+sha-a1', 'expected' => 'release-1.2.3-rc.1+sha-a1'];
         yield 'no prefix' => [
             'input' => '1.2.3',
             'expected' => '1.2.3',
@@ -171,6 +198,8 @@ class VersionTest extends TestCase
             'input' => 'release-1.2.3',
             'expected' => 'release-1.2.3',
         ];
+        yield 'plus in prefix' => ['input' => 'release+package-1.2.3', 'expected' => 'release+package-1.2.3'];
+        yield 'plus in prefix with metadata' => ['input' => 'release+package-1.2.3+001', 'expected' => 'release+package-1.2.3+001'];
         yield 'multi-digit parts' => [
             'input' => 'v10.20.30',
             'expected' => 'v10.20.30',
@@ -208,6 +237,13 @@ class VersionTest extends TestCase
      */
     public static function invalidVersionStringProvider(): iterable
     {
+        yield 'empty metadata' => ['input' => 'v1.2.3+'];
+        yield 'invalid metadata character' => ['input' => 'v1.2.3+build_1'];
+        yield 'empty metadata component' => ['input' => 'v1.2.3+build..1'];
+        yield 'repeated metadata separator' => ['input' => 'v1.2.3+build+4.5.6'];
+        yield 'metadata trailing newline' => ['input' => "v1.2.3+build.1\n"];
+        yield 'invalid metadata before numeric suffix' => ['input' => 'v1.2.3+build_1.4.5.6'];
+        yield 'invalid prerelease before metadata' => ['input' => 'v1.2.3-rc.01+build.4.5.6'];
         yield 'missing patch' => ['input' => '1.2'];
         yield 'missing minor and patch' => ['input' => '1'];
         yield 'invalid string' => ['input' => 'foo'];
