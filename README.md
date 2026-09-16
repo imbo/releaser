@@ -74,6 +74,8 @@ As required by [Semantic Versioning](https://semver.org/spec/v2.0.0.html#spec-it
 
 Pass `--dry-run` to preview the calculated release and release notes without creating a tag or release.
 
+If no eligible pull requests are found, run `create` with `-v` to see which pull requests were skipped and why. Reasons include invalid Conventional Commit messages, configuration filters, missing merge commit IDs, or commits outside the changes since the previous tag.
+
 ### Example release workflow
 
 Imbo Releaser calculates the next version from the titles of merged pull requests. Use a [Conventional Commit](https://www.conventionalcommits.org/) title when creating a pull request:
@@ -145,6 +147,8 @@ imbo-releaser delete --tag-only 1.2.3
 | `1`  | Error                                                     |
 | `2`  | Invalid usage (e.g. missing required argument)            |
 | `3`  | Aborted by the user (e.g. declined a confirmation prompt) |
+
+Invalid commands, options, argument values, and configuration files return `2`. GitHub API failures and releases with no eligible pull requests return `1`.
 
 ## Configuration
 

@@ -15,6 +15,7 @@ use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 
 use function sprintf;
@@ -293,16 +294,7 @@ class CreateReleaseTest extends TestCase
 
     public function testRejectsPrereleaseWithLeadingZero(): void
     {
-        [$guzzleClient, $history] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([[
-                'number' => 1,
-                'user' => ['login' => 'alice'],
-                'merged_at' => '2024-01-01T00:00:00Z',
-                'title' => 'feat: a feature',
-                'base' => ['ref' => 'main'],
-            ]])), // pull requests
-            new Response(200, [], $this->json([])), // tags
-        );
+        [$guzzleClient, $history] = $this->getGuzzleClient();
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
         $this->expectException(InvalidArgumentException::class);
@@ -310,10 +302,7 @@ class CreateReleaseTest extends TestCase
         try {
             $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--prerelease' => '01'], ['interactive' => false]);
         } finally {
-            $this->assertCount(2, $history);
-            foreach ($history as $transaction) {
-                $this->assertSame('GET', $transaction['request']->getMethod());
-            }
+            $this->assertCount(0, $history);
         }
     }
 
@@ -353,19 +342,12 @@ class CreateReleaseTest extends TestCase
     public function testNoPullRequests(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
-            new Response(200, [], $this->json([[
-                'name' => 'v1.0.0',
-                'commit' => ['sha' => 'sha'],
-            ]])), // pull requests (malformed item skipped before conversion)
-            new Response(200, [], $this->json([
-                'committer' => ['date' => '2024-01-01T00:00:00Z'],
-            ])), // unused commit response
-            new Response(200, [], $this->json([])), // unused pull requests response
+            new Response(200, [], $this->json([])), // pull requests
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No pull requests found, aborting release.');
+        $this->expectExceptionMessage('No merged pull requests were returned for branch "main" in repository "owner/repo".');
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
     }
 
@@ -390,8 +372,12 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No pull requests found, aborting release.');
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+        $this->expectExceptionMessage('No eligible pull requests remain');
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false, 'verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
+        } finally {
+            $this->assertStringContainsString('Skipping pull request #1: excluded by filterPullRequest() in the configuration.', $commandTester->getDisplay());
+        }
     }
 
     public function testSkipsNonConventionalPullRequestsBeforeFiltering(): void
@@ -415,8 +401,12 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No pull requests found, aborting release.');
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+        $this->expectExceptionMessage('No eligible pull requests remain');
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false, 'verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
+        } finally {
+            $this->assertStringContainsString('Skipping pull request #1: its title or body is not a valid Conventional Commit message.', $commandTester->getDisplay());
+        }
     }
 
     public function testNoPullRequestsSinceLastTag(): void
@@ -440,8 +430,12 @@ class CreateReleaseTest extends TestCase
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No pull requests found for the release.');
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main']);
+        $this->expectExceptionMessage('No eligible pull requests match the changes since tag "v1.0.0" on branch "main".');
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false, 'verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
+        } finally {
+            $this->assertStringContainsString('Skipping pull request #1: its merge commit is not in the changes since tag "v1.0.0".', $commandTester->getDisplay());
+        }
     }
 
     public function testReleaseMembershipUsesCommitsInsteadOfTimestamps(): void
@@ -491,6 +485,7 @@ class CreateReleaseTest extends TestCase
         $this->assertStringContainsString('new fix', $display);
         $this->assertStringContainsString('fix with an earlier timestamp', $display);
         $this->assertStringNotContainsString('already released breaking change', $display);
+        $this->assertStringNotContainsString('Skipping pull request', $display);
         $this->assertStringNotContainsString('@alice made their first contribution', $display);
         $this->assertStringContainsString('@bob made their first contribution', $display);
         $this->assertCount(3, $history);
@@ -519,7 +514,7 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('No pull requests found for the release.');
+        $this->expectExceptionMessage('No eligible pull requests match the changes since tag "v1.0.0"');
         try {
             $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
         } finally {
@@ -561,10 +556,12 @@ class CreateReleaseTest extends TestCase
         );
         $commandTester = new CommandTester($this->createCommand($guzzleClient));
 
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
+        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false, 'verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
 
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $display = $commandTester->getDisplay();
+        $this->assertStringContainsString('Skipping pull request #1: GitHub did not provide a merge commit ID.', $display);
+        $this->assertStringContainsString('Skipping pull request #2: GitHub did not provide a merge commit ID.', $display);
         $this->assertStringContainsString('with tag "v1.0.1"', $display);
         $this->assertStringContainsString('included fix', $display);
         $this->assertStringNotContainsString('change with null SHA', $display);

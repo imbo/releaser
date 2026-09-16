@@ -17,8 +17,16 @@ class EntrypointTest extends TestCase
     /**
      * @return iterable<string,array{arguments:list<string>,message:string}>
      */
-    public static function missingInputProvider(): iterable
+    public static function invalidUsageProvider(): iterable
     {
+        yield 'unknown command' => ['arguments' => ['not-a-command'], 'message' => 'not defined'];
+        yield 'unknown option' => ['arguments' => ['list', '--unknown-option'], 'message' => 'does not exist'];
+        yield 'missing option value' => ['arguments' => ['create', '--branch'], 'message' => 'requires a value'];
+        yield 'extra argument' => ['arguments' => ['list', 'extra'], 'message' => 'No arguments expected'];
+        yield 'invalid repository' => ['arguments' => ['list', '--repository', 'owner/'], 'message' => 'Invalid repository string'];
+        yield 'invalid version' => ['arguments' => ['delete', '--repository', 'owner/repo', 'invalid'], 'message' => 'Invalid version'];
+        yield 'invalid template' => ['arguments' => ['create', '--repository', 'owner/repo', '--branch', 'main', '--template', '/missing/template.twig'], 'message' => 'specified template file'];
+        yield 'invalid prerelease' => ['arguments' => ['create', '--repository', 'owner/repo', '--branch', 'main', '--prerelease', '01'], 'message' => 'Invalid prerelease identifier'];
         yield 'create repository' => ['arguments' => ['create', '--branch', 'main'], 'message' => 'Specify a GitHub repository'];
         yield 'list repository' => ['arguments' => ['list'], 'message' => 'Specify a GitHub repository'];
         yield 'delete repository' => ['arguments' => ['delete', 'v1.0.0'], 'message' => 'Specify a GitHub repository'];
@@ -31,8 +39,8 @@ class EntrypointTest extends TestCase
     /**
      * @param list<string> $arguments
      */
-    #[DataProvider('missingInputProvider')]
-    public function testMissingInputReturnsInvalidUsage(array $arguments, string $message): void
+    #[DataProvider('invalidUsageProvider')]
+    public function testInvalidUsageReturnsTwo(array $arguments, string $message): void
     {
         $process = new Process([
             PHP_BINARY,
@@ -47,6 +55,18 @@ class EntrypointTest extends TestCase
 
         $this->assertSame(2, $process->getExitCode(), $process->getErrorOutput());
         $this->assertStringContainsString($message, $process->getErrorOutput());
+    }
+
+    public function testInvalidConfigReturnsInvalidUsage(): void
+    {
+        $process = new Process([
+            PHP_BINARY, dirname(__DIR__).'/imbo-releaser', 'list', '--no-interaction',
+            '--config', __DIR__.'/fixtures/invalid-custom-config.php',
+        ]);
+        $process->run();
+
+        $this->assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+        $this->assertStringContainsString('does not return a valid configuration', $process->getErrorOutput());
     }
 
     public function testHelpDoesNotRequireGitHubToken(): void
