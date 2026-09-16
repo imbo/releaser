@@ -11,8 +11,8 @@ interface ConfigInterface
     /**
      * Get the initial version.
      *
-     * If no releases are found in the repository, this version will be used as the version for the
-     * first release.
+     * Used when getLatestTagForBranch() finds no previous tag for the selected branch.
+     * By default, only matching stable tags are considered, after applying filterTag().
      */
     public function initialVersion(): Version;
 
