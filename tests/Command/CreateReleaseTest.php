@@ -672,6 +672,12 @@ class CreateReleaseTest extends TestCase
 
     public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
     {
+        $config = new class extends Config {
+            protected function initialVersionString(): string
+            {
+                return "-release'&v1.2.3";
+            }
+        };
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([[
                 'number' => 1,
@@ -686,11 +692,11 @@ class CreateReleaseTest extends TestCase
             new Response(201), // tag reference creation
             new Response(422), // release creation
         );
-        $command = $this->createCommand($guzzleClient);
+        $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Failed to create the GitHub release, but the tag "v0.1.0" was created. Delete the tag before retrying: imbo-releaser delete --tag-only v0.1.0');
+        $this->expectExceptionMessage("Delete the tag before retrying: imbo-releaser delete --tag-only -- '-release'\\''&v1.2.3'");
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
     }
 

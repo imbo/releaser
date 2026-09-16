@@ -279,7 +279,7 @@ class CreateRelease extends BaseCommand
         try {
             $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier);
         } catch (ReleaseCreationException $e) {
-            throw new RuntimeException(sprintf('Failed to create the GitHub release, but the tag "%s" was created. Delete the tag before retrying: imbo-releaser delete --tag-only %s', $nextVersion, $nextVersion), previous: $e);
+            throw new RuntimeException(sprintf('Failed to create the GitHub release, but the tag "%s" was created. Delete the tag before retrying: imbo-releaser delete --tag-only -- %s', $nextVersion, escapeshellarg((string) $nextVersion)), previous: $e);
         }
 
         $output->writeln(sprintf('Release created: <info>%s</info>', $release->htmlUrl));

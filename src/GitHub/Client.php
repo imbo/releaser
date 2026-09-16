@@ -218,7 +218,7 @@ final class Client
     public function deleteRelease(Repository $repository, Version $version): void
     {
         try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/releases/tags/%s', $repository, $version));
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/releases/tags/%s', $repository, rawurlencode((string) $version)));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to find release for version "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
@@ -246,7 +246,7 @@ final class Client
     public function deleteTag(Repository $repository, Version $version): void
     {
         try {
-            $this->httpClient->request('DELETE', sprintf('/repos/%s/git/refs/tags/%s', $repository, $version));
+            $this->httpClient->request('DELETE', sprintf('/repos/%s/git/refs/tags/%s', $repository, rawurlencode((string) $version)));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
