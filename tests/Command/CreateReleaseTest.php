@@ -893,7 +893,7 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("Delete the tag before retrying: imbo-releaser delete --tag-only -- '-release'\\''&v1.2.3'");
+        $this->expectExceptionMessage('Delete the tag before retrying: imbo-releaser delete --tag-only -- '.escapeshellarg("-release'&v1.2.3"));
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
     }
 

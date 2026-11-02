@@ -50,7 +50,7 @@ class EntrypointTest extends TestCase
             '--no-ansi',
             '--config',
             __DIR__.'/fixtures/valid-custom-config-1.php',
-        ]);
+        ], env: ['COLUMNS' => '200']);
         $process->run();
 
         $this->assertSame(2, $process->getExitCode(), $process->getErrorOutput());
@@ -62,7 +62,7 @@ class EntrypointTest extends TestCase
         $process = new Process([
             PHP_BINARY, dirname(__DIR__).'/imbo-releaser', 'list', '--no-interaction',
             '--config', __DIR__.'/fixtures/invalid-custom-config.php',
-        ]);
+        ], env: ['COLUMNS' => '200']);
         $process->run();
 
         $this->assertSame(2, $process->getExitCode(), $process->getErrorOutput());

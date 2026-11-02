@@ -157,7 +157,7 @@ class DeleteReleaseTest extends TestCase
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only -- '1.0.0'");
+        $this->expectExceptionMessage('The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only -- '.escapeshellarg('1.0.0'));
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0'], ['interactive' => false]);
     }
 
@@ -210,7 +210,7 @@ class DeleteReleaseTest extends TestCase
         $tester = new CommandTester($this->createCommand($guzzleClient));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("Retry with: imbo-releaser delete --tag-only -- '-release'\\''&v1.2.3'");
+        $this->expectExceptionMessage('Retry with: imbo-releaser delete --tag-only -- '.escapeshellarg($version));
         $tester->execute(['--repository' => 'owner/repo', 'version' => $version], ['interactive' => false]);
     }
 
