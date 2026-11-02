@@ -5,6 +5,7 @@ namespace ImboReleaser\Config;
 use ImboReleaser\Config;
 use ImboReleaser\ConfigInterface;
 use ImboReleaser\Exception\InvalidArgumentException;
+use Symfony\Component\Filesystem\Path;
 use Throwable;
 
 use function getenv;
@@ -132,7 +133,7 @@ final class Resolver
      */
     private function loadConfigFile(string $file): ?array
     {
-        if (!str_starts_with($file, DIRECTORY_SEPARATOR)) {
+        if (!Path::isAbsolute($file)) {
             $file = $this->cwd.DIRECTORY_SEPARATOR.$file;
         }
 

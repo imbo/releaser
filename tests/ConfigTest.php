@@ -26,7 +26,7 @@ class ConfigTest extends TestCase
         $this->assertTrue($config->filterBranch(new Branch('main')));
         $this->assertTrue($config->filterBranch(new Branch('v1')));
         $this->assertFalse($config->filterBranch(new Branch('feature-branch')));
-        $this->assertStringEndsWith('/templates/default.twig', (string) $config->template());
+        $this->assertStringEndsWith('/templates/default.twig', str_replace('\\', '/', (string) $config->template()));
         $this->assertSame([
             'New Features 🚀' => ['feat'],
             'Bug Fixes 🐛' => ['fix'],

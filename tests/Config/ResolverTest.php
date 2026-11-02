@@ -10,6 +10,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function dirname;
+use function str_replace;
+
+use const DIRECTORY_SEPARATOR;
 
 #[CoversClass(Resolver::class)]
 class ResolverTest extends TestCase
@@ -35,6 +38,34 @@ class ResolverTest extends TestCase
         (new Resolver())->getConfig(dirname(__DIR__).'/fixtures/missing-config.php');
     }
 
+    /**
+     * @return iterable<string,array{path:string}>
+     */
+    public static function absoluteConfigPathProvider(): iterable
+    {
+        $path = dirname(__DIR__).DIRECTORY_SEPARATOR.'fixtures'.DIRECTORY_SEPARATOR.'valid-custom-config-1.php';
+
+        yield 'native separators' => ['path' => $path];
+        yield 'forward slashes' => ['path' => str_replace('\\', '/', $path)];
+    }
+
+    #[DataProvider('absoluteConfigPathProvider')]
+    public function testAbsoluteConfigPathDoesNotDependOnWorkingDirectory(string $path): void
+    {
+        $resolver = new Resolver(new Config(), __DIR__.'/missing-directory');
+
+        $this->assertSame('1.0.0', (string) $resolver->getConfig($path)->initialVersion());
+        $this->assertSame($path, $resolver->configFilePath());
+    }
+
+    public function testRelativeConfigPathUsesWorkingDirectory(): void
+    {
+        $resolver = new Resolver(new Config(), dirname(__DIR__));
+
+        $this->assertSame('1.0.0', (string) $resolver->getConfig('fixtures/valid-custom-config-1.php')->initialVersion());
+        $this->assertSame(dirname(__DIR__).DIRECTORY_SEPARATOR.'fixtures/valid-custom-config-1.php', $resolver->configFilePath());
+    }
+
     public function testFailsWhenAutomaticallyDiscoveredConfigIsInvalid(): void
     {
         $resolver = new Resolver(
@@ -44,7 +75,7 @@ class ResolverTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('invalid-config/.imbo-releaser.php" does not return a valid configuration');
+        $this->expectExceptionMessage('invalid-config'.DIRECTORY_SEPARATOR.'.imbo-releaser.php" does not return a valid configuration');
         $resolver->getConfig();
     }
 
@@ -129,7 +160,7 @@ class ResolverTest extends TestCase
                 $this->fail('Expected a config file path, got null');
             }
 
-            $this->assertStringEndsWith($expectedConfigFilePath, $path);
+            $this->assertStringEndsWith($expectedConfigFilePath, str_replace('\\', '/', $path));
         }
 
         $this->assertSame($config, $resolver->getConfig());
@@ -161,7 +192,7 @@ class ResolverTest extends TestCase
             $this->assertSame('9.9.9', (string) $config->initialVersion());
             $path = $resolver->configFilePath();
             $this->assertNotNull($path);
-            $this->assertStringEndsWith('fixtures/config-home/imbo-releaser/config.php', $path);
+            $this->assertStringEndsWith('fixtures/config-home/imbo-releaser/config.php', str_replace('\\', '/', $path));
         } finally {
             if (false === $originalXdg) {
                 putenv('XDG_CONFIG_HOME');
@@ -187,7 +218,7 @@ class ResolverTest extends TestCase
             $this->assertSame('8.8.8', (string) $config->initialVersion());
             $path = $resolver->configFilePath();
             $this->assertNotNull($path);
-            $this->assertStringEndsWith('fixtures/home/.config/imbo-releaser/config.php', $path);
+            $this->assertStringEndsWith('fixtures/home/.config/imbo-releaser/config.php', str_replace('\\', '/', $path));
         } finally {
             if (false === $originalXdg) {
                 putenv('XDG_CONFIG_HOME');
