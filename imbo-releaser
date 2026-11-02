@@ -9,7 +9,6 @@ use GuzzleHttp\Client as GuzzleHttpClient;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use ImboReleaser\Console\Application;
-use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\GitHub\Middleware\Retry;
 use ImboReleaser\GitHub\Middleware\TokenAuthentication;
@@ -36,7 +35,8 @@ foreach ($autoloaders as $file) {
 }
 
 if (null === $autoloader) {
-    throw new RuntimeException('Unable to locate autoload.php file.');
+    fwrite(STDERR, 'Error: Unable to locate autoload.php. Run "composer install" in the project directory to install dependencies.'.PHP_EOL);
+    exit(1);
 }
 
 require $autoloader;

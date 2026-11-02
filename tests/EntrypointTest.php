@@ -5,15 +5,42 @@ namespace ImboReleaser;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 use function dirname;
 
 use const PHP_BINARY;
+use const PHP_EOL;
 
 #[CoversNothing]
 class EntrypointTest extends TestCase
 {
+    public function testMissingAutoloaderReturnsAnActionableError(): void
+    {
+        $filesystem = new Filesystem();
+        $directory = sys_get_temp_dir().'/imbo-releaser-'.bin2hex(random_bytes(8));
+        // Keep every candidate autoloader path inside the isolated directory.
+        $entrypoint = $directory.'/package/bin/imbo-releaser';
+
+        try {
+            $filesystem->mkdir(dirname($entrypoint));
+            $filesystem->copy(dirname(__DIR__).'/imbo-releaser', $entrypoint);
+
+            $process = new Process([PHP_BINARY, $entrypoint, '--help']);
+            $process->run();
+
+            $this->assertSame(1, $process->getExitCode(), $process->getErrorOutput());
+            $this->assertSame('', $process->getOutput());
+            $this->assertSame(
+                'Error: Unable to locate autoload.php. Run "composer install" in the project directory to install dependencies.'.PHP_EOL,
+                $process->getErrorOutput(),
+            );
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     /**
      * @return iterable<string,array{arguments:list<string>,message:string}>
      */

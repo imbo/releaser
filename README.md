@@ -152,7 +152,7 @@ imbo-releaser delete --tag-only 1.2.3
 | `2`  | Invalid usage (e.g. missing required argument)            |
 | `3`  | Aborted by the user (e.g. declined a confirmation prompt) |
 
-Invalid commands, options, argument values, and configuration files return `2`. GitHub API failures and releases with no eligible pull requests return `1`.
+Invalid commands, options, argument values, and configuration files return `2`. Missing Composer dependencies, GitHub API failures, and releases with no eligible pull requests return `1`.
 
 ## Configuration
 
