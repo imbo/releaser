@@ -120,8 +120,7 @@ class ClientTest extends TestCase
         yield 'reserved characters' => ['branchName' => 'release/1+2&x=3#4%5', 'encodedName' => 'release%2F1%2B2%26x%3D3%234%255'];
     }
 
-    #[DataProvider('branchNameProvider')]
-    public function testGetPullRequests(string $branchName, string $encodedName): void
+    public function testGetAllMergedPullRequests(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
@@ -140,16 +139,43 @@ class ClientTest extends TestCase
         );
 
         $client = new Client($guzzleClient);
-        $pullRequests = iterator_to_array($client->getMergedPullRequests(new Branch($branchName), new Repository('owner', 'repo')));
+        $pullRequests = iterator_to_array($client->getAllMergedPullRequests(new Repository('owner', 'repo')));
 
         $this->assertCount(2, $pullRequests);
         $this->assertSame(4, $pullRequests[0]->number);
         $this->assertSame(2, $pullRequests[1]->number);
 
         $this->assertCount(1, $history);
-        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&base='.$encodedName.'&per_page=100', (string) $history[0]['request']->getUri());
-        parse_str($history[0]['request']->getUri()->getQuery(), $query);
-        $this->assertSame($branchName, $query['base']);
+        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&per_page=100', (string) $history[0]['request']->getUri());
+    }
+
+    public function testGetAllMergedPullRequestsAcrossBranches(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, ['Link' => '</pulls?page=2>; rel="next"'], $this->json([[
+                'number' => 2,
+                'user' => ['login' => 'alice'],
+                'title' => 'Not a Conventional Commit',
+                'merged_at' => '2024-02-01T00:00:00Z',
+                'base' => ['ref' => 'main'],
+            ]])), // pull requests (page 1)
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'alice'],
+                'title' => 'fix: earlier contribution',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => '1.x'],
+            ]])), // pull requests (page 2)
+        );
+
+        $pullRequests = iterator_to_array((new Client($guzzleClient))->getAllMergedPullRequests(new Repository('owner', 'repo')));
+
+        $this->assertCount(2, $pullRequests);
+        $this->assertSame('main', $pullRequests[0]->baseRef);
+        $this->assertSame('1.x', $pullRequests[1]->baseRef);
+        $this->assertCount(2, $history);
+        $this->assertSame('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('/pulls?page=2', (string) $history[1]['request']->getUri());
     }
 
     public function testFetchPaginatedWithErrorResponse(): void
@@ -528,7 +554,7 @@ class ClientTest extends TestCase
         $this->assertSame($prerelease, $releasePayload['prerelease']);
     }
 
-    public function testGetMergedPullRequestsSkipsDrafts(): void
+    public function testGetAllMergedPullRequestsSkipsDrafts(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
@@ -537,13 +563,13 @@ class ClientTest extends TestCase
             ])), // pull requests
         );
 
-        $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
+        $pullRequests = iterator_to_array((new Client($guzzleClient))->getAllMergedPullRequests(new Repository('owner', 'repo')));
 
         $this->assertCount(1, $pullRequests);
         $this->assertSame(2, $pullRequests[0]->number);
     }
 
-    public function testGetMergedPullRequestsSkipsMissingUser(): void
+    public function testGetAllMergedPullRequestsSkipsMissingUser(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json([
@@ -552,7 +578,7 @@ class ClientTest extends TestCase
             ])), // pull requests
         );
 
-        $pullRequests = iterator_to_array((new Client($guzzleClient))->getMergedPullRequests(new Branch('main'), new Repository('owner', 'repo')));
+        $pullRequests = iterator_to_array((new Client($guzzleClient))->getAllMergedPullRequests(new Repository('owner', 'repo')));
 
         $this->assertCount(1, $pullRequests);
         $this->assertSame(2, $pullRequests[0]->number);
