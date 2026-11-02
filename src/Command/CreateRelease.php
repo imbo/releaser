@@ -269,7 +269,7 @@ class CreateRelease extends BaseCommand
         if ($dryRun) {
             $output->writeln(sprintf('Would create %s "%s" with tag "%s" in "%s".', $releaseType, $name, $nextVersion, $repository));
             $output->writeln('Release notes:');
-            $output->writeln($releaseNotes);
+            $output->writeln($releaseNotes, OutputInterface::OUTPUT_RAW);
 
             return self::SUCCESS;
         }
