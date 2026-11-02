@@ -81,7 +81,7 @@ final class Client
     }
 
     /**
-     * Get pull requests merged to a specific branch for the given repository.
+     * Get merged pull requests across all branches in the given repository.
      *
      * Drafts and pull requests missing either a user or a merged timestamp are skipped.
      *
@@ -91,14 +91,10 @@ final class Client
      *
      * @return iterable<PullRequest>
      */
-    public function getMergedPullRequests(Branch $branch, Repository $repository): iterable
+    public function getAllMergedPullRequests(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf(
-                '/repos/%s/pulls?state=closed&sort=created&direction=desc&base=%s&per_page=100',
-                $repository,
-                rawurlencode($branch->name),
-            ),
+            sprintf('/repos/%s/pulls?state=closed&sort=created&direction=desc&per_page=100', $repository),
             PullRequest::fromAPI(...),
             static function (array $item): bool {
                 return

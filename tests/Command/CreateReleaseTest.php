@@ -760,6 +760,73 @@ class CreateReleaseTest extends TestCase
         $this->assertStringContainsString('@bob made their first contribution', $commandTester->getDisplay());
     }
 
+    public function testPullRequestsOnOtherBranchesDoNotMakeBranchEligibleForRelease(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json([[
+                'number' => 1,
+                'user' => ['login' => 'alice'],
+                'title' => 'feat: maintenance feature',
+                'merged_at' => '2024-01-01T00:00:00Z',
+                'base' => ['ref' => '1.x'],
+            ]])), // pull requests
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No merged pull requests were returned for branch "main"');
+        try {
+            $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
+        } finally {
+            $this->assertCount(1, $history);
+        }
+    }
+
+    public function testNewContributorsIncludeUnfilteredRepositoryHistory(): void
+    {
+        $pullRequests = [];
+        foreach ([
+            [8, 'dave', 'fix: second contribution', '2024-03-02', 'main', []],
+            [7, 'dave', 'fix: first contribution', '2024-03-01', 'main', []],
+            [6, 'carol', 'fix: current contribution', '2024-03-01', 'main', []],
+            [5, 'bob', 'fix: current contribution', '2024-03-01', 'main', []],
+            [4, 'alice', 'fix: current contribution', '2024-03-01', 'main', []],
+            [3, 'carol', 'feat!: earlier contribution on another branch', '2024-01-01', '1.x', []],
+            [2, 'bob', 'feat: earlier excluded contribution', '2024-01-01', 'main', [['name' => 'skip-release']]],
+            [1, 'alice', 'Not a Conventional Commit', '2024-01-01', 'main', []],
+        ] as [$number, $login, $title, $date, $branch, $labels]) {
+            $pullRequests[] = [
+                'number' => $number,
+                'user' => ['login' => $login],
+                'title' => $title,
+                'merged_at' => $date.'T00:00:00Z',
+                'base' => ['ref' => $branch],
+                'labels' => $labels,
+            ];
+        }
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json($pullRequests)), // pull requests
+            new Response(200, [], $this->json([])), // tags
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute([
+            '--repository' => 'owner/repo',
+            '--branch' => 'main',
+            '--dry-run' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        foreach (['alice', 'bob', 'carol'] as $login) {
+            $this->assertStringNotContainsString('@'.$login.' made their first contribution', $tester->getDisplay());
+        }
+        $this->assertStringContainsString('@dave made their first contribution in https://github.com/owner/repo/pull/7', $tester->getDisplay());
+        $this->assertStringNotContainsString('earlier contribution on another branch', $tester->getDisplay());
+        $this->assertStringNotContainsString('earlier excluded contribution', $tester->getDisplay());
+        $this->assertStringContainsString('fix: current contribution by @alice', $tester->getDisplay());
+        $this->assertCount(2, $history);
+        $this->assertStringNotContainsString('base=', $history[0]['request']->getUri()->getQuery());
+    }
+
     public function testDryRunDoesNotCreateRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(

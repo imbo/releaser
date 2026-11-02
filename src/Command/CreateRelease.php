@@ -7,6 +7,7 @@ use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\ReleaseCreationException;
 use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
+use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\GitHub\Repository;
@@ -197,7 +198,7 @@ class CreateRelease extends BaseCommand
             }
         }
 
-        $pullRequests = $this->getMergedPullRequests($branch, $repository, $output);
+        [$allPullRequests, $pullRequests] = $this->getMergedPullRequests($branch, $repository, $output);
 
         $allTags = $this->getTags($repository, $output);
         $tags = array_values(array_filter($allTags, $this->config->filterTag(...)));
@@ -244,7 +245,7 @@ class CreateRelease extends BaseCommand
             $repository,
             $pullRequestsInRelease,
             $this->groupedPullRequests($pullRequestsInRelease, $this->config->pullRequestGroups(), $this->config->fallbackGroup()),
-            $this->getNewContributors($pullRequests, $pullRequestsInRelease),
+            $this->getNewContributors($allPullRequests, $pullRequestsInRelease),
             $this->getApplication()?->getVersion(),
         ));
 
@@ -301,10 +302,11 @@ class CreateRelease extends BaseCommand
     /**
      * Get a list of new contributors.
      *
+     * Check all merged pull requests in the repository, regardless of branch, title, or filters.
      * Contributors with a pull request outside this release are excluded. For new contributors,
      * use their earliest merged pull request in the release and sort by username.
      *
-     * @param list<ReleasePullRequest> $pullRequests
+     * @param list<PullRequest>        $pullRequests
      * @param list<ReleasePullRequest> $pullRequestsInRelease
      *
      * @return array<string,ReleasePullRequest> an associative array where the keys are the GitHub usernames of the new contributors and the values are the first pull request merged by the contributor
@@ -419,11 +421,11 @@ class CreateRelease extends BaseCommand
     }
 
     /**
-     * Get a list of pull requests merged to the given branch and repository.
+     * Get all merged pull requests and the eligible pull requests for the given branch.
      *
      * The returned pull requests are sorted by creation date in descending order.
      *
-     * @return list<ReleasePullRequest>
+     * @return array{list<PullRequest>,list<ReleasePullRequest>}
      *
      * @throws RuntimeException
      */
@@ -432,11 +434,17 @@ class CreateRelease extends BaseCommand
         $progress = new ProgressIndicator($output);
         $progress->start('Fetching pull requests...');
 
+        $allPullRequests = [];
         $pullRequests = [];
         $mergedCount = 0;
-        foreach ($this->gitHubClient->getMergedPullRequests($branch, $repository) as $pullRequest) {
-            ++$mergedCount;
+        foreach ($this->gitHubClient->getAllMergedPullRequests($repository) as $pullRequest) {
+            $allPullRequests[] = $pullRequest;
             $progress->advance();
+            if ($pullRequest->baseRef !== $branch->name) {
+                continue;
+            }
+
+            ++$mergedCount;
             try {
                 $releasePullRequest = ReleasePullRequest::fromPullRequest($pullRequest);
             } catch (InvalidArgumentException) {
@@ -462,7 +470,7 @@ class CreateRelease extends BaseCommand
             throw new RuntimeException('No eligible pull requests remain: all were excluded by the configuration or have invalid Conventional Commit messages. Run with -v to see why each pull request was skipped.');
         }
 
-        return $pullRequests;
+        return [$allPullRequests, $pullRequests];
     }
 
     /**
