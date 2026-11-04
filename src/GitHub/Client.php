@@ -106,6 +106,29 @@ final class Client
     }
 
     /**
+     * Get all commits reachable from head, following all pages.
+     *
+     * @see https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#list-commits
+     *
+     * @return iterable<string>
+     *
+     * @throws RuntimeException
+     */
+    public function getCommitShas(Repository $repository, string $head): iterable
+    {
+        return $this->fetchPaginated(
+            sprintf('/repos/%s/commits?sha=%s&per_page=100', $repository, rawurlencode($head)),
+            static function (array $commit): string {
+                if (!is_string($commit['sha'] ?? null) || '' === $commit['sha']) {
+                    throw new RuntimeException('Missing or invalid commit "sha" in GitHub commits response.');
+                }
+
+                return $commit['sha'];
+            },
+        );
+    }
+
+    /**
      * Get commits reachable from head but not from base, following all comparison pages.
      *
      * @see https://docs.github.com/en/rest/commits/commits?apiVersion=2026-03-10#compare-two-commits
@@ -173,11 +196,17 @@ final class Client
     /**
      * Create a GitHub release.
      *
+     * Supply a commit SHA to tag a previously resolved snapshot instead of the current branch head.
+     *
      * @see https://docs.github.com/en/rest/releases/releases?apiVersion=2026-03-10#create-a-release
      */
-    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes, ?string $name = null, bool $draft = false, bool $prerelease = false): Release
+    public function createRelease(Repository $repository, Branch $branch, Version $version, string $releaseNotes, ?string $name = null, bool $draft = false, bool $prerelease = false, ?string $commitSha = null): Release
     {
-        $this->createAnnotatedTag($repository, $branch, $version, $releaseNotes);
+        if (null === $commitSha) {
+            $commitSha = $this->getBranchSha($repository, $branch);
+        }
+
+        $this->createAnnotatedTag($repository, $commitSha, $version, $releaseNotes);
 
         try {
             $response = $this->httpClient->request('POST', sprintf('/repos/%s/releases', $repository), [
@@ -276,23 +305,44 @@ final class Client
     }
 
     /**
-     * Create an annotated tag in the specified repository, pointing to the given branch.
+     * Get the commit SHA for the head of the specified branch in the given repository.
+     *
+     * @see https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
+     *
+     * @throws RuntimeException
+     */
+    public function getBranchSha(Repository $repository, Branch $branch): string
+    {
+        try {
+            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, rawurlencode($branch->name)));
+        } catch (TransferException $e) {
+            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
+        }
+
+        $data = $this->responseToArray($response);
+        if (!is_array($data['commit'] ?? null) || !is_string($data['commit']['sha'] ?? null)) {
+            throw new RuntimeException(sprintf('Missing required "commit.sha" key for branch "%s"', $branch->name));
+        }
+
+        return $data['commit']['sha'];
+    }
+
+    /**
+     * Create an annotated tag in the specified repository, pointing to the given commit.
      *
      * @see https://docs.github.com/en/rest/git/tags?apiVersion=2026-03-10#create-a-tag-object
      * @see https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#create-a-reference
      *
      * @throws RuntimeException
      */
-    private function createAnnotatedTag(Repository $repository, Branch $branch, Version $version, string $releaseNotes): void
+    private function createAnnotatedTag(Repository $repository, string $commitSha, Version $version, string $releaseNotes): void
     {
-        $branchSha = $this->getBranchSha($repository, $branch);
-
         try {
             $response = $this->httpClient->request('POST', sprintf('/repos/%s/git/tags', $repository), [
                 'json' => [
                     'tag' => (string) $version,
                     'message' => $releaseNotes,
-                    'object' => $branchSha,
+                    'object' => $commitSha,
                     'type' => 'commit',
 
                     // 'tagger' => ['name' => '...', 'email' => '...'],
@@ -317,29 +367,6 @@ final class Client
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to create tag reference for version "%s" and sha "%s", got: "%s"', $version, $tagData['sha'], $this->responseStatus($e)), previous: $e);
         }
-    }
-
-    /**
-     * Get the commit SHA for the head of the specified branch in the given repository.
-     *
-     * @see https://docs.github.com/en/rest/branches/branches?apiVersion=2026-03-10#get-a-branch
-     *
-     * @throws RuntimeException
-     */
-    private function getBranchSha(Repository $repository, Branch $branch): string
-    {
-        try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, rawurlencode($branch->name)));
-        } catch (TransferException $e) {
-            throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
-        }
-
-        $data = $this->responseToArray($response);
-        if (!is_array($data['commit'] ?? null) || !is_string($data['commit']['sha'] ?? null)) {
-            throw new RuntimeException(sprintf('Missing required "commit.sha" key for branch "%s"', $branch->name));
-        }
-
-        return $data['commit']['sha'];
     }
 
     /**

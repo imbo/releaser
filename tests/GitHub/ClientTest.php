@@ -233,6 +233,65 @@ class ClientTest extends TestCase
         iterator_to_array((new Client($guzzleClient))->getTags(Repository::fromString('owner/repo')));
     }
 
+    public function testGetCommitShasFollowsPagination(): void
+    {
+        $shas = array_map(static fn (int $number): string => 'sha'.$number, range(1, 251));
+        $commits = array_map(static fn (string $sha): array => ['sha' => $sha], $shas);
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, ['Link' => '</repos/owner/repo/commits?sha=headSha&per_page=100&page=2>; rel="next"'], $this->json(array_slice($commits, 0, 100))),
+            new Response(200, ['Link' => '</repos/owner/repo/commits?sha=headSha&per_page=100&page=3>; rel="next"'], $this->json(array_slice($commits, 100, 100))),
+            new Response(200, [], $this->json(array_slice($commits, 200))),
+        );
+
+        $actual = iterator_to_array((new Client($guzzleClient))->getCommitShas(new Repository('owner', 'repo'), 'headSha'));
+
+        $this->assertSame($shas, $actual);
+        $this->assertCount(3, $history);
+        $this->assertSame('/repos/owner/repo/commits?sha=headSha&per_page=100', (string) $history[0]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/commits?sha=headSha&per_page=100&page=2', (string) $history[1]['request']->getUri());
+        $this->assertSame('/repos/owner/repo/commits?sha=headSha&per_page=100&page=3', (string) $history[2]['request']->getUri());
+    }
+
+    public function testGetCommitShasEncodesHead(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(200, [], $this->json([])));
+
+        $this->assertSame([], iterator_to_array((new Client($guzzleClient))->getCommitShas(new Repository('owner', 'repo'), 'release/1+2&x=3')));
+        $this->assertSame('/repos/owner/repo/commits?sha=release%2F1%2B2%26x%3D3&per_page=100', (string) $history[0]['request']->getUri());
+    }
+
+    /**
+     * @return iterable<string,array{commit:array{sha?:int|string}}>
+     */
+    public static function invalidCommitProvider(): iterable
+    {
+        yield 'missing sha' => ['commit' => []];
+        yield 'invalid sha' => ['commit' => ['sha' => 123]];
+        yield 'empty sha' => ['commit' => ['sha' => '']];
+    }
+
+    /**
+     * @param array{sha?:int|string} $commit
+     */
+    #[DataProvider('invalidCommitProvider')]
+    public function testGetCommitShasRejectsInvalidCommit(array $commit): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(200, [], $this->json([$commit])));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing or invalid commit "sha" in GitHub commits response.');
+        iterator_to_array((new Client($guzzleClient))->getCommitShas(new Repository('owner', 'repo'), 'headSha'));
+    }
+
+    public function testGetCommitShasFailsWhenSnapshotIsUnavailable(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(404));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('404 Not Found');
+        iterator_to_array((new Client($guzzleClient))->getCommitShas(new Repository('owner', 'repo'), 'headSha'));
+    }
+
     public function testGetCommitShasBetweenFollowsPagination(): void
     {
         $shas = array_map(static fn (int $number): string => 'sha'.$number, range(1, 251));
@@ -361,6 +420,54 @@ class ClientTest extends TestCase
 
         $this->assertCount(1, $history);
         $this->assertSame('/repos/owner/repo/git/commits/abc123', (string) $history[0]['request']->getUri());
+    }
+
+    #[DataProvider('branchNameProvider')]
+    public function testGetBranchSha(string $branchName, string $encodedName): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branch-sha-123']])),
+        );
+
+        $sha = (new Client($guzzleClient))->getBranchSha(Repository::fromString('owner/repo'), new Branch($branchName));
+
+        $this->assertSame('branch-sha-123', $sha);
+        $this->assertCount(1, $history);
+        $this->assertSame('GET', $history[0]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/branches/'.$encodedName, (string) $history[0]['request']->getUri());
+    }
+
+    public function testCreateReleaseWithPinnedCommitSha(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(201, [], $this->json(['sha' => 'tag-sha-456'])), // tag object creation
+            new Response(201), // tag reference creation
+            new Response(201, [], $this->json([
+                'name' => 'v1.0.1',
+                'tag_name' => 'v1.0.1',
+                'html_url' => 'https://github.com/owner/repo/releases/tag/v1.0.1',
+                'created_at' => '2026-01-01T00:00:00Z',
+            ])), // release creation
+        );
+
+        $release = (new Client($guzzleClient))->createRelease(
+            Repository::fromString('owner/repo'),
+            new Branch('main'),
+            Version::fromString('v1.0.1'),
+            'Reviewed release notes',
+            commitSha: 'reviewed-commit-sha',
+        );
+
+        $this->assertSame('v1.0.1', $release->tagName);
+        $this->assertCount(3, $history);
+        foreach ($history as $transaction) {
+            $this->assertSame('POST', $transaction['request']->getMethod());
+        }
+        $this->assertSame('/repos/owner/repo/git/tags', (string) $history[0]['request']->getUri());
+        /** @var array{object:string,message:string} $tagPayload */
+        $tagPayload = json_decode((string) $history[0]['request']->getBody(), true);
+        $this->assertSame('reviewed-commit-sha', $tagPayload['object']);
+        $this->assertSame('Reviewed release notes', $tagPayload['message']);
     }
 
     public function testCreateReleaseWithServerErrorWhenFetchingBranchSha(): void
