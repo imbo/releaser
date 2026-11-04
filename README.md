@@ -64,7 +64,9 @@ imbo-releaser create --help
 
 This command calculates the next version, generates release notes from the pull requests merged since the previous release, and creates an annotated Git tag and a GitHub release. By default it opens your editor so you can review and adjust the release notes, and asks for confirmation before anything is created.
 
-When a previous tag exists, the application checks which pull requests added commits since that tag. It uses commit identifiers rather than dates, so differences between a commit's date and the time its pull request was merged do not cause already released changes to be included again. If GitHub does not provide the resulting commit's identifier for a pull request, that pull request is skipped and affects neither the release notes nor the next version.
+Before fetching pull requests, the application resolves the selected branch to a commit identifier. Release calculation and tag creation use this same snapshot, even if the branch advances while you review the notes. Changes merged after the snapshot are left for a later release. This also applies to dry runs, but a separate `create` invocation resolves a new snapshot.
+
+When a previous tag exists, the application checks which pull requests added commits between that tag and the snapshot. For a first release, it checks which pull requests added commits reachable from the snapshot. It uses commit identifiers rather than dates, so differences between a commit's date and the time its pull request was merged do not cause already released changes to be included again. If GitHub does not provide the resulting commit's identifier for a pull request, that pull request is skipped and affects neither the release notes nor the next version, including for a first release.
 
 Pass `--name` to set the GitHub release name; otherwise the calculated version is used. Pass `--draft` to create the GitHub release as a draft.
 
@@ -76,7 +78,7 @@ As required by [Semantic Versioning](https://semver.org/spec/v2.0.0.html#spec-it
 
 Pass `--dry-run` to preview the calculated release and release notes without creating a tag or release.
 
-If no eligible pull requests are found, run `create` with `-v` to see which pull requests were skipped and why. Reasons include invalid Conventional Commit messages, configuration filters, missing merge commit IDs, or commits outside the changes since the previous tag.
+If no eligible pull requests are found, run `create` with `-v` to see which pull requests were skipped and why. Reasons include invalid Conventional Commit messages, configuration filters, missing merge commit IDs, commits outside the branch snapshot, or commits already included in the previous tag.
 
 ### Example release workflow
 

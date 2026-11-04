@@ -3,6 +3,8 @@
 namespace ImboReleaser\Command;
 
 use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Config;
 use ImboReleaser\Config\Resolver;
@@ -14,7 +16,9 @@ use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\RequestInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -24,6 +28,151 @@ use function sprintf;
 class CreateReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
+
+    /**
+     * @return iterable<string,array{initialRelease:bool,expectedVersion:string}>
+     */
+    public static function snapshotReleaseProvider(): iterable
+    {
+        yield 'first release' => ['initialRelease' => true, 'expectedVersion' => 'v0.1.0'];
+        yield 'subsequent release' => ['initialRelease' => false, 'expectedVersion' => 'v1.0.1'];
+    }
+
+    #[DataProvider('snapshotReleaseProvider')]
+    public function testReleaseUsesPinnedSnapshotWhenBranchMoves(bool $initialRelease, string $expectedVersion): void
+    {
+        $branchHead = 'snapshotSha';
+        $branchLookups = 0;
+        $requests = [];
+        $commitsUrl = $initialRelease
+            ? '/repos/owner/repo/commits?sha=snapshotSha&per_page=100'
+            : '/repos/owner/repo/compare/tagsha...snapshotSha?per_page=100';
+        $respond = function (RequestInterface $request) use (&$branchHead, &$branchLookups, &$requests, $initialRelease, $expectedVersion, $commitsUrl): Response {
+            $url = (string) $request->getUri();
+            $requests[] = $url;
+            if ('/repos/owner/repo/branches/main' === $url) {
+                ++$branchLookups;
+
+                return new Response(200, [], $this->json(['commit' => ['sha' => $branchHead]]));
+            }
+
+            if ('/repos/owner/repo/pulls?state=closed&sort=created&direction=desc&per_page=100' === $url) {
+                // A breaking change merges after the snapshot, but before PRs are fetched.
+                $branchHead = 'laterSha';
+
+                return new Response(200, [], $this->json([[
+                    'number' => 2, 'user' => ['login' => 'bob'],
+                    'title' => 'feat!: later breaking change',
+                    'merged_at' => '2026-01-03T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merge_commit_sha' => 'laterSha',
+                ], [
+                    'number' => 1, 'user' => ['login' => 'alice'],
+                    'title' => 'fix: reviewed fix',
+                    'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merge_commit_sha' => 'snapshotSha',
+                ]]));
+            }
+
+            if ('/repos/owner/repo/tags?per_page=100' === $url) {
+                return new Response(200, [], $this->json($initialRelease ? [] : [['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']]]));
+            }
+
+            if ($commitsUrl === $url) {
+                return new Response(200, ['Link' => sprintf('<%s&page=2>; rel="next"', $commitsUrl)], $this->json($initialRelease ? [] : ['commits' => []]));
+            }
+
+            if ($commitsUrl.'&page=2' === $url) {
+                $commits = [['sha' => 'snapshotSha']];
+
+                return new Response(200, [], $this->json($initialRelease ? $commits : ['commits' => $commits]));
+            }
+
+            if ('/repos/owner/repo/git/tags' === $url) {
+                /** @var array{tag:string,object:string,message:string} $payload */
+                $payload = json_decode((string) $request->getBody(), true);
+                $this->assertSame($expectedVersion, $payload['tag']);
+                $this->assertSame('snapshotSha', $payload['object']);
+                $this->assertStringContainsString('reviewed fix', $payload['message']);
+                $this->assertStringNotContainsString('later breaking change', $payload['message']);
+
+                return new Response(201, [], $this->json(['sha' => 'newTagSha']));
+            }
+
+            if ('/repos/owner/repo/git/refs' === $url) {
+                return new Response(201);
+            }
+
+            if ('/repos/owner/repo/releases' === $url) {
+                /** @var array{body:string} $payload */
+                $payload = json_decode((string) $request->getBody(), true);
+                $this->assertStringContainsString('reviewed fix', $payload['body']);
+                $this->assertStringNotContainsString('later breaking change', $payload['body']);
+
+                return new Response(201, [], $this->json([
+                    'name' => $expectedVersion, 'tag_name' => $expectedVersion,
+                    'html_url' => 'url', 'created_at' => '2026-01-04T00:00:00Z',
+                ]));
+            }
+
+            $this->fail(sprintf('Unexpected request: %s %s', $request->getMethod(), $url));
+        };
+        $handler = HandlerStack::create(new MockHandler(array_fill(0, 8, $respond)));
+        $tester = new CommandTester($this->createCommand(new GuzzleClient(['handler' => $handler])));
+        $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertSame('laterSha', $branchHead);
+        $this->assertSame(1, $branchLookups);
+        $this->assertCount(8, $requests);
+        $this->assertSame('/repos/owner/repo/branches/main', $requests[0]);
+    }
+
+    public function testSnapshotLookupFailureStopsBeforeFetchingPullRequests(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(404));
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to request branch data from the GitHub API for branch "main"');
+        try {
+            $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+        } finally {
+            $this->assertCount(1, $history);
+            $this->assertSame('GET', $history[0]['request']->getMethod());
+            $this->assertSame('/repos/owner/repo/branches/main', (string) $history[0]['request']->getUri());
+        }
+    }
+
+    public function testInitialReleaseWithoutPullRequestsInSnapshotDoesNotWrite(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'snapshotSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => 'feat: later feature',
+                'merged_at' => '2026-01-02T00:00:00Z', 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'laterSha',
+            ], [
+                'number' => 2, 'user' => ['login' => 'bob'], 'title' => 'fix: missing merge commit',
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main'],
+            ]])),
+            new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json([['sha' => 'snapshotSha']])), // snapshot commits
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('No eligible pull requests match the branch snapshot "snapshotSha" on branch "main".');
+        try {
+            $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false, 'verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
+        } finally {
+            $this->assertCount(4, $history);
+            foreach ($history as $transaction) {
+                $this->assertSame('GET', $transaction['request']->getMethod());
+            }
+            $this->assertStringContainsString('Skipping pull request #1: its merge commit is not reachable from branch snapshot "snapshotSha".', $tester->getDisplay());
+            $this->assertStringContainsString('Skipping pull request #2: GitHub did not provide a merge commit ID.', $tester->getDisplay());
+        }
+    }
 
     public function testGroupsTypesCaseInsensitively(): void
     {
@@ -45,6 +194,7 @@ class CreateReleaseTest extends TestCase
             ];
         }
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json($prs)), // pull requests
             new Response(200, [], $this->json([['name' => 'v1.0.0', 'commit' => ['sha' => 'tagsha']]])), // tags
             new Response(200, [], $this->json(['commits' => [['sha' => 'merge0'], ['sha' => 'merge1'], ['sha' => 'merge2'], ['sha' => 'merge3']]])), // commits since the tag
@@ -64,6 +214,7 @@ class CreateReleaseTest extends TestCase
     public function testReleaseNotesIncludeBreakingChangesAndScopes(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([
                 [
                     'number' => 1, 'user' => ['login' => 'alice'],
@@ -76,27 +227,27 @@ class CreateReleaseTest extends TestCase
 
                     Refs: #42
                     BODY,
-                    'merged_at' => '2024-01-01T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merged_at' => '2024-01-01T00:00:00Z', 'base' => ['ref' => 'main'], 'merge_commit_sha' => 'merge1',
                 ],
                 [
                     'number' => 2, 'user' => ['login' => 'bob'],
                     'title' => 'fix: remove the old option',
                     'body' => 'BREAKING-CHANGE: Use the replacement option.',
-                    'merged_at' => '2024-01-02T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merged_at' => '2024-01-02T00:00:00Z', 'base' => ['ref' => 'main'], 'merge_commit_sha' => 'merge2',
                 ],
                 [
                     'number' => 3, 'user' => ['login' => 'bob'],
                     'title' => 'fix!: remove deprecated behavior',
-                    'merged_at' => '2024-01-03T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merged_at' => '2024-01-03T00:00:00Z', 'base' => ['ref' => 'main'], 'merge_commit_sha' => 'merge3',
                 ],
                 [
                     'number' => 4, 'user' => ['login' => 'bob'],
                     'title' => 'fix(cache): correct expiry',
-                    'merged_at' => '2024-01-04T00:00:00Z', 'base' => ['ref' => 'main'],
+                    'merged_at' => '2024-01-04T00:00:00Z', 'base' => ['ref' => 'main'], 'merge_commit_sha' => 'merge4',
                 ],
             ])), // pull requests
             new Response(200, [], $this->json([])), // tags
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(200, [], $this->json([['sha' => 'merge1'], ['sha' => 'merge2'], ['sha' => 'merge3'], ['sha' => 'merge4']])), // snapshot commits
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
             new Response(201, [], $this->json([
@@ -109,9 +260,9 @@ class CreateReleaseTest extends TestCase
 
         $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
         /** @var array{message:string} $tag */
-        $tag = json_decode((string) $history[3]['request']->getBody(), true);
+        $tag = json_decode((string) $history[4]['request']->getBody(), true);
         /** @var array{body:string} $release */
-        $release = json_decode((string) $history[5]['request']->getBody(), true);
+        $release = json_decode((string) $history[6]['request']->getBody(), true);
         $releaseNotes = <<<RELEASE_NOTES
         ## New Features 🚀
         * feat(API)!: replace the client by @alice in https://github.com/owner/repo/pull/1
@@ -192,19 +343,21 @@ class CreateReleaseTest extends TestCase
                 ['name' => 'main'],
                 ['name' => 'develop'],
             ])), // branches
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 123,
                 'user' => ['login' => 'johndoe'],
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'title' => 'feat: support `Map<K, V>` & "quoted values"',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'nightly', 'commit' => ['sha' => 'nightlySha']],
                 ['name' => 'v0.1.0-rc.1', 'commit' => ['sha' => 'releaseCandidateSha']],
                 ['name' => 'v0.2.0-rc.1', 'commit' => ['sha' => 'otherReleaseCandidateSha']],
             ])), // tags
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
             new Response(201, [], $this->json([
@@ -221,7 +374,7 @@ class CreateReleaseTest extends TestCase
         $this->assertStringContainsString('Only one branch available (main)', $commandTester->getDisplay());
         $this->assertStringContainsString('You are about to create the draft prerelease "Release 0.1" for tag "v0.1.0-rc.2" in repository "owner/repo".', $commandTester->getDisplay());
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
-        $this->assertCount(7, $history);
+        $this->assertCount(8, $history);
 
         $req = $history[0]['request'];
         $this->assertSame('GET', $req->getMethod());
@@ -229,15 +382,19 @@ class CreateReleaseTest extends TestCase
 
         $req = $history[1]['request'];
         $this->assertSame('GET', $req->getMethod());
-        $this->assertSame('/repos/owner/repo/pulls', $req->getUri()->getPath());
+        $this->assertSame('/repos/owner/repo/branches/main', $req->getUri()->getPath());
 
         $req = $history[2]['request'];
         $this->assertSame('GET', $req->getMethod());
-        $this->assertSame('/repos/owner/repo/tags', $req->getUri()->getPath());
+        $this->assertSame('/repos/owner/repo/pulls', $req->getUri()->getPath());
 
         $req = $history[3]['request'];
         $this->assertSame('GET', $req->getMethod());
-        $this->assertSame('/repos/owner/repo/branches/main', $req->getUri()->getPath());
+        $this->assertSame('/repos/owner/repo/tags', $req->getUri()->getPath());
+
+        $req = $history[4]['request'];
+        $this->assertSame('GET', $req->getMethod());
+        $this->assertSame('/repos/owner/repo/commits?sha=branchSha&per_page=100', (string) $req->getUri());
 
         $releaseNotes = <<<RELEASE_NOTES
         ## New Features 🚀
@@ -252,7 +409,7 @@ class CreateReleaseTest extends TestCase
 
         RELEASE_NOTES;
 
-        $req = $history[4]['request'];
+        $req = $history[5]['request'];
         $this->assertSame('POST', $req->getMethod());
         $this->assertSame('/repos/owner/repo/git/tags', $req->getUri()->getPath());
         $this->assertSame('/repos/owner/repo/git/tags', $req->getUri()->getPath());
@@ -265,7 +422,7 @@ class CreateReleaseTest extends TestCase
         $this->assertSame('commit', $data['type']);
         $this->assertSame($releaseNotes, $data['message']);
 
-        $req = $history[5]['request'];
+        $req = $history[6]['request'];
         $this->assertSame('POST', $req->getMethod());
         $this->assertSame('/repos/owner/repo/git/refs', $req->getUri()->getPath());
         $body = $req->getBody()->getContents();
@@ -276,7 +433,7 @@ class CreateReleaseTest extends TestCase
         $this->assertSame('refs/tags/v0.1.0-rc.2', $data['ref']);
         $this->assertSame('tagSha', $data['sha']);
 
-        $req = $history[6]['request'];
+        $req = $history[7]['request'];
         $this->assertSame('POST', $req->getMethod());
         $this->assertSame('/repos/owner/repo/releases', $req->getUri()->getPath());
         $body = $req->getBody()->getContents();
@@ -314,15 +471,17 @@ class CreateReleaseTest extends TestCase
                 ['name' => 'v1'],
                 ['name' => 'v2.x'],
             ])), // branches
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 123,
                 'user' => ['login' => 'johndoe'],
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'title' => 'feat: add new feature',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
             new Response(201, [], $this->json([
@@ -342,6 +501,7 @@ class CreateReleaseTest extends TestCase
     public function testNoPullRequests(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([])), // pull requests
         );
         $command = $this->createCommand($guzzleClient);
@@ -360,6 +520,7 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
@@ -389,6 +550,7 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
@@ -412,6 +574,7 @@ class CreateReleaseTest extends TestCase
     public function testNoPullRequestsSinceLastTag(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
@@ -441,6 +604,7 @@ class CreateReleaseTest extends TestCase
     public function testReleaseMembershipUsesCommitsInsteadOfTimestamps(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([
                 [
                     'number' => 3,
@@ -488,13 +652,14 @@ class CreateReleaseTest extends TestCase
         $this->assertStringNotContainsString('Skipping pull request', $display);
         $this->assertStringNotContainsString('@alice made their first contribution', $display);
         $this->assertStringContainsString('@bob made their first contribution', $display);
-        $this->assertCount(3, $history);
-        $this->assertSame('/repos/owner/repo/compare/tagsha...main?per_page=100', (string) $history[2]['request']->getUri());
+        $this->assertCount(4, $history);
+        $this->assertSame('/repos/owner/repo/compare/tagsha...branchSha?per_page=100', (string) $history[3]['request']->getUri());
     }
 
     public function testAlreadyReleasedPullRequestWithLaterMergeTimestampDoesNotCreateRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 84,
                 'user' => ['login' => 'alice'],
@@ -518,7 +683,7 @@ class CreateReleaseTest extends TestCase
         try {
             $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main'], ['interactive' => false]);
         } finally {
-            $this->assertCount(3, $history);
+            $this->assertCount(4, $history);
             foreach ($history as $transaction) {
                 $this->assertSame('GET', $transaction['request']->getMethod());
             }
@@ -528,6 +693,7 @@ class CreateReleaseTest extends TestCase
     public function testSkipsPullRequestsWithoutMergeCommitSha(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'alice'],
@@ -569,7 +735,7 @@ class CreateReleaseTest extends TestCase
         $this->assertStringNotContainsString('@alice made their first contribution', $display);
         $this->assertStringNotContainsString('@bob made their first contribution', $display);
         $this->assertStringContainsString('@charlie made their first contribution', $display);
-        $this->assertCount(3, $history);
+        $this->assertCount(4, $history);
     }
 
     public function testFilterTag(): void
@@ -581,16 +747,19 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v1.0.0', 'commit' => ['sha' => 'tagSha']],
             ])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -598,7 +767,7 @@ class CreateReleaseTest extends TestCase
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true]);
 
         $this->assertSame(CreateRelease::ABORTED, $commandTester->getStatusCode());
-        $this->assertCount(2, $history);
+        $this->assertCount(4, $history);
     }
 
     public function testFilteredPrereleaseTagStillAdvancesPrereleaseNumber(): void
@@ -610,16 +779,19 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v0.1.0-rc.1', 'commit' => ['sha' => 'tagSha']],
             ])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -644,16 +816,19 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([
                 ['name' => 'v0.1.0', 'commit' => ['sha' => 'tagSha']],
             ])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
@@ -666,6 +841,7 @@ class CreateReleaseTest extends TestCase
     public function testReleaseWithExistingTag(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 2,
                 'user' => ['login' => 'jane'],
@@ -687,7 +863,6 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json([
                 'commits' => [['sha' => 'fixSha']],
             ])), // commits since the tag
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
             new Response(201, [], $this->json(['sha' => 'newTagSha'])), // tag object creation
             new Response(201), // tag reference creation
             new Response(201, [], $this->json([
@@ -714,6 +889,7 @@ class CreateReleaseTest extends TestCase
     public function testNewContributorsAreDeterminedByMergeDate(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 // Created last but merged before the previous release.
                 'number' => 3,
@@ -763,6 +939,7 @@ class CreateReleaseTest extends TestCase
     public function testPullRequestsOnOtherBranchesDoNotMakeBranchEligibleForRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'alice'],
@@ -778,7 +955,7 @@ class CreateReleaseTest extends TestCase
         try {
             $tester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--dry-run' => true], ['interactive' => false]);
         } finally {
-            $this->assertCount(1, $history);
+            $this->assertCount(2, $history);
         }
     }
 
@@ -802,11 +979,14 @@ class CreateReleaseTest extends TestCase
                 'merged_at' => $date.'T00:00:00Z',
                 'base' => ['ref' => $branch],
                 'labels' => $labels,
+                'merge_commit_sha' => 'merge'.$number,
             ];
         }
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json($pullRequests)), // pull requests
             new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json(array_map(static fn (int $number): array => ['sha' => 'merge'.$number], range(1, 8)))), // snapshot commits
         );
         $tester = new CommandTester($this->createCommand($guzzleClient));
         $tester->execute([
@@ -823,21 +1003,24 @@ class CreateReleaseTest extends TestCase
         $this->assertStringNotContainsString('earlier contribution on another branch', $tester->getDisplay());
         $this->assertStringNotContainsString('earlier excluded contribution', $tester->getDisplay());
         $this->assertStringContainsString('fix: current contribution by @alice', $tester->getDisplay());
-        $this->assertCount(2, $history);
-        $this->assertStringNotContainsString('base=', $history[0]['request']->getUri()->getQuery());
+        $this->assertCount(4, $history);
+        $this->assertStringNotContainsString('base=', $history[1]['request']->getUri()->getQuery());
     }
 
     public function testDryRunDoesNotCreateRelease(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: preserve `<info>value</info>` and `<error>message</error>`',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -864,7 +1047,7 @@ class CreateReleaseTest extends TestCase
 
         RELEASE_NOTES;
         $this->assertStringContainsString($releaseNotes, $commandTester->getDisplay());
-        $this->assertCount(2, $history);
+        $this->assertCount(4, $history);
     }
 
     public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
@@ -876,15 +1059,17 @@ class CreateReleaseTest extends TestCase
             }
         };
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
-            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch sha
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
             new Response(422), // release creation
@@ -900,14 +1085,17 @@ class CreateReleaseTest extends TestCase
     public function testUserDeclinesConfirmation(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);
@@ -916,7 +1104,7 @@ class CreateReleaseTest extends TestCase
 
         $this->assertSame(CreateRelease::ABORTED, $commandTester->getStatusCode());
         $this->assertStringNotContainsString('Release created', $commandTester->getDisplay());
-        $this->assertCount(2, $history);
+        $this->assertCount(4, $history);
     }
 
     public function testInvalidTemplate(): void
@@ -941,14 +1129,17 @@ class CreateReleaseTest extends TestCase
     public function testInvalidReleaseNotesTemplate(): void
     {
         [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
                 'user' => ['login' => 'user1'],
                 'title' => 'feat: new feature',
                 'merged_at' => '2024-01-01T00:00:00Z',
                 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
             ]])), // pull requests
             new Response(200, [], $this->json([])), // tags
+            new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
         );
         $command = $this->createCommand($guzzleClient);
         $commandTester = new CommandTester($command);

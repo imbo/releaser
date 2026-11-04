@@ -198,37 +198,47 @@ class CreateRelease extends BaseCommand
             }
         }
 
+        $branchSha = $this->gitHubClient->getBranchSha($repository, $branch);
         [$allPullRequests, $pullRequests] = $this->getMergedPullRequests($branch, $repository, $output);
 
         $allTags = $this->getTags($repository, $output);
         $tags = array_values(array_filter($allTags, $this->config->filterTag(...)));
         $tag = $this->config->getLatestTagForBranch($branch, $tags);
         if (null === $tag) {
-            $nextVersion = $this->config->initialVersion();
-            $pullRequestsInRelease = $pullRequests;
+            $commits = $this->gitHubClient->getCommitShas($repository, $branchSha);
         } else {
-            $commitShas = array_fill_keys(iterator_to_array($this->gitHubClient->getCommitShasBetween($repository, $tag->sha, $branch->name)), true);
-            $pullRequestsInRelease = [];
-            foreach ($pullRequests as $pullRequest) {
-                if (null === $pullRequest->mergeCommitSha) {
-                    $output->writeln(sprintf('Skipping pull request #%d: GitHub did not provide a merge commit ID.', $pullRequest->number), OutputInterface::VERBOSITY_VERBOSE);
-                    continue;
-                }
-
-                if (!isset($commitShas[$pullRequest->mergeCommitSha])) {
-                    $output->writeln(sprintf('Skipping pull request #%d: its merge commit is not in the changes since tag "%s".', $pullRequest->number, $tag->name), OutputInterface::VERBOSITY_VERBOSE);
-                    continue;
-                }
-
-                $pullRequestsInRelease[] = $pullRequest;
-            }
-
-            if ([] === $pullRequestsInRelease) {
-                throw new RuntimeException(sprintf('No eligible pull requests match the changes since tag "%s" on branch "%s". Run with -v to see why pull requests were skipped.', $tag->name, $branch->name));
-            }
-
-            $nextVersion = $this->config->determineNextVersion($tag, $pullRequestsInRelease);
+            $commits = $this->gitHubClient->getCommitShasBetween($repository, $tag->sha, $branchSha);
         }
+        $commitShas = array_fill_keys(iterator_to_array($commits), true);
+        $pullRequestsInRelease = [];
+        foreach ($pullRequests as $pullRequest) {
+            if (null === $pullRequest->mergeCommitSha) {
+                $output->writeln(sprintf('Skipping pull request #%d: GitHub did not provide a merge commit ID.', $pullRequest->number), OutputInterface::VERBOSITY_VERBOSE);
+                continue;
+            }
+
+            if (!isset($commitShas[$pullRequest->mergeCommitSha])) {
+                $output->writeln(null === $tag
+                    ? sprintf('Skipping pull request #%d: its merge commit is not reachable from branch snapshot "%s".', $pullRequest->number, $branchSha)
+                    : sprintf('Skipping pull request #%d: its merge commit is not in the changes since tag "%s".', $pullRequest->number, $tag->name),
+                    OutputInterface::VERBOSITY_VERBOSE,
+                );
+                continue;
+            }
+
+            $pullRequestsInRelease[] = $pullRequest;
+        }
+
+        if ([] === $pullRequestsInRelease) {
+            $message = null === $tag
+                ? sprintf('No eligible pull requests match the branch snapshot "%s" on branch "%s". Run with -v to see why pull requests were skipped.', $branchSha, $branch->name)
+                : sprintf('No eligible pull requests match the changes since tag "%s" on branch "%s". Run with -v to see why pull requests were skipped.', $tag->name, $branch->name);
+            throw new RuntimeException($message);
+        }
+
+        $nextVersion = null === $tag
+            ? $this->config->initialVersion()
+            : $this->config->determineNextVersion($tag, $pullRequestsInRelease);
 
         if (null !== $prereleaseIdentifier) {
             $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $allTags);
@@ -289,7 +299,7 @@ class CreateRelease extends BaseCommand
         }
 
         try {
-            $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier);
+            $release = $this->gitHubClient->createRelease($repository, $branch, $nextVersion, $releaseNotes, $name, $draft, null !== $prereleaseIdentifier, $branchSha);
         } catch (ReleaseCreationException $e) {
             throw new RuntimeException(sprintf('Failed to create the GitHub release, but the tag "%s" was created. Delete the tag before retrying: imbo-releaser delete --tag-only -- %s', $nextVersion, escapeshellarg((string) $nextVersion)), previous: $e);
         }
