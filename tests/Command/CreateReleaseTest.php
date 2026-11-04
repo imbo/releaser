@@ -1053,6 +1053,11 @@ class CreateReleaseTest extends TestCase
     public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
     {
         $config = new class extends Config {
+            public function gitHubRepository(): string
+            {
+                return 'default/repo';
+            }
+
             protected function initialVersionString(): string
             {
                 return "-release'&v1.2.3";
@@ -1078,7 +1083,7 @@ class CreateReleaseTest extends TestCase
         $commandTester = new CommandTester($command);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Delete the tag before retrying: imbo-releaser delete --tag-only -- '.escapeshellarg("-release'&v1.2.3"));
+        $this->expectExceptionMessage('Delete the tag before retrying: imbo-releaser delete --repository '.escapeshellarg('owner/repo').' --tag-only -- '.escapeshellarg("-release'&v1.2.3"));
         $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
     }
 

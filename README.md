@@ -142,8 +142,10 @@ Pass `-d` or `--dry-run` with a version to preview the deletion without deleting
 The GitHub release and its tag are deleted in separate steps. If the release is deleted but deleting the tag fails, remove the remaining tag with:
 
 ```bash
-imbo-releaser delete --tag-only 1.2.3
+imbo-releaser delete --repository owner/repo --tag-only -- 1.2.3
 ```
+
+Recovery commands printed after a partial creation or deletion failure include the original repository so they do not depend on your default repository configuration.
 
 ## Exit codes
 
