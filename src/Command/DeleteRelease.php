@@ -198,7 +198,7 @@ class DeleteRelease extends BaseCommand
         }
 
         try {
-            $this->gitHubClient->deleteTag($repository, $version);
+            $tagDeleted = $this->gitHubClient->deleteTag($repository, $version, !$tagOnly);
         } catch (RuntimeException $e) {
             if (!$tagOnly) {
                 throw new RuntimeException(sprintf('Failed to delete tag "%s" after deleting its GitHub release. The release was deleted, but the tag remains. Retry with: imbo-releaser delete --repository %s --tag-only -- %s', $version, escapeshellarg((string) $repository), escapeshellarg((string) $version)), previous: $e);
@@ -206,7 +206,10 @@ class DeleteRelease extends BaseCommand
 
             throw $e;
         }
-        $output->writeln(sprintf('Successfully deleted tag <info>%s</info>', $version));
+        $output->writeln($tagDeleted
+            ? sprintf('Successfully deleted tag <info>%s</info>', $version)
+            : sprintf('Tag <info>%s</info> does not exist; nothing to delete.', $version),
+        );
 
         return self::SUCCESS;
     }

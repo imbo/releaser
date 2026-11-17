@@ -811,7 +811,7 @@ class ClientTest extends TestCase
             new Response(204), // delete tag
         );
 
-        (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString($tagName));
+        $this->assertTrue((new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString($tagName)));
 
         $this->assertCount(1, $history);
         $this->assertSame('/repos/owner/repo/git/refs/tags/'.$encodedName, (string) $history[0]['request']->getUri());
@@ -828,5 +828,88 @@ class ClientTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Failed to delete tag reference "1.0.0", got: "404 Not Found"');
         (new Client($guzzleClient))->deleteTag(Repository::fromString('owner/repo'), Version::fromString('1.0.0'));
+    }
+
+    /**
+     * @return iterable<string,array{status:int}>
+     */
+    public static function missingReferenceStatusProvider(): iterable
+    {
+        yield 'not found' => ['status' => 404];
+        yield 'validation failed' => ['status' => 422];
+    }
+
+    #[DataProvider('missingReferenceStatusProvider')]
+    public function testDeleteTagAllowsConfirmedMissingReference(int $status): void
+    {
+        $version = Version::fromString('release/one+two&x=1-v1.2.3');
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response($status), // delete tag
+            new Response(404), // confirm that the tag reference is absent
+        );
+
+        $this->assertFalse((new Client($guzzleClient))->deleteTag(new Repository('owner', 'repo'), $version, true));
+        $this->assertCount(2, $history);
+        $this->assertSame('DELETE', $history[0]['request']->getMethod());
+        $this->assertSame('GET', $history[1]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/git/ref/tags/release%2Fone%2Btwo%26x%3D1-v1.2.3', (string) $history[1]['request']->getUri());
+    }
+
+    public function testDeleteTagWithAllowMissingDoesNotCheckAfterSuccess(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+
+        $this->assertTrue((new Client($guzzleClient))->deleteTag(new Repository('owner', 'repo'), Version::fromString('v1.0.0'), true));
+        $this->assertCount(1, $history);
+    }
+
+    /**
+     * @return iterable<string,array{status:int}>
+     */
+    public static function tagDeletionFailureStatusProvider(): iterable
+    {
+        yield 'permission denied' => ['status' => 403];
+        yield 'server error' => ['status' => 500];
+    }
+
+    #[DataProvider('tagDeletionFailureStatusProvider')]
+    public function testDeleteTagWithAllowMissingDoesNotHideOtherDeletionErrors(int $status): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response($status));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete tag reference "v1.0.0"');
+        try {
+            (new Client($guzzleClient))->deleteTag(new Repository('owner', 'repo'), Version::fromString('v1.0.0'), true);
+        } finally {
+            $this->assertCount(1, $history);
+        }
+    }
+
+    #[DataProvider('missingReferenceStatusProvider')]
+    public function testDeleteTagWithAllowMissingStillFailsIfReferenceExists(int $status): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response($status),
+            new Response(200, [], $this->json(['ref' => 'refs/tags/v1.0.0'])),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete tag reference "v1.0.0"');
+        try {
+            (new Client($guzzleClient))->deleteTag(new Repository('owner', 'repo'), Version::fromString('v1.0.0'), true);
+        } finally {
+            $this->assertCount(2, $history);
+        }
+    }
+
+    #[DataProvider('tagDeletionFailureStatusProvider')]
+    public function testDeleteTagWithAllowMissingDoesNotHideVerificationErrors(int $status): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(new Response(422), new Response($status));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to check tag reference "v1.0.0"');
+        (new Client($guzzleClient))->deleteTag(new Repository('owner', 'repo'), Version::fromString('v1.0.0'), true);
     }
 }

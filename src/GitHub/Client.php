@@ -17,6 +17,7 @@ use Psr\Http\Message\ResponseInterface;
 
 use function array_key_exists;
 use function gettype;
+use function in_array;
 use function is_array;
 use function is_int;
 use function is_string;
@@ -291,17 +292,32 @@ final class Client
     /**
      * Delete a Git tag reference from the repository.
      *
+     * When missing tags are allowed, confirm absence after a 404 or 422 deletion response.
+     * Other failures are not treated as missing tags.
+     *
      * @see https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#delete-a-reference
+     *
+     * @return bool true if deleted, false if confirmed missing and allowed
      *
      * @throws RuntimeException
      */
-    public function deleteTag(Repository $repository, Version $version): void
+    public function deleteTag(Repository $repository, Version $version, bool $allowMissing = false): bool
     {
         try {
             $this->httpClient->request('DELETE', sprintf('/repos/%s/git/refs/tags/%s', $repository, rawurlencode((string) $version)));
         } catch (TransferException $e) {
+            if ($allowMissing
+                && $e instanceof ResponseException
+                && in_array($e->getResponse()->getStatusCode(), [404, 422], true)
+                && !$this->tagExists($repository, $version)
+            ) {
+                return false;
+            }
+
             throw new RuntimeException(sprintf('Failed to delete tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
         }
+
+        return true;
     }
 
     /**
@@ -325,6 +341,28 @@ final class Client
         }
 
         return $data['commit']['sha'];
+    }
+
+    /**
+     * Check whether an exact tag reference exists, without accepting other request failures as absence.
+     *
+     * @see https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#get-a-reference
+     *
+     * @throws RuntimeException
+     */
+    private function tagExists(Repository $repository, Version $version): bool
+    {
+        try {
+            $this->httpClient->request('GET', sprintf('/repos/%s/git/ref/tags/%s', $repository, rawurlencode((string) $version)));
+        } catch (TransferException $e) {
+            if ($e instanceof ResponseException && 404 === $e->getResponse()->getStatusCode()) {
+                return false;
+            }
+
+            throw new RuntimeException(sprintf('Failed to check tag reference "%s", got: "%s"', $version, $this->responseStatus($e)), previous: $e);
+        }
+
+        return true;
     }
 
     /**

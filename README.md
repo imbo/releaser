@@ -137,6 +137,8 @@ Both the version argument and the selection list use the same supported version 
 
 Draft releases are supported too: supply their tag name as the version or select them from the list. Your token must have access to the draft.
 
+After successfully deleting a release, a confirmed missing tag is treated as success. This includes drafts whose tags have not been created yet. No extra option is needed. Permission and server errors still fail, and standalone `--tag-only` deletion still fails if the tag is missing.
+
 Pass `-d` or `--dry-run` with a version to preview the deletion without deleting the GitHub release or tag.
 
 The GitHub release and its tag are deleted in separate steps. If the release is deleted but deleting the tag fails, remove the remaining tag with:
