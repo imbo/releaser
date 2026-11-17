@@ -154,10 +154,16 @@ class DeleteReleaseTest extends TestCase
             new Response(204), // delete release
             new Response(500), // delete tag
         );
-        $command = $this->createCommand($guzzleClient);
+        $config = new class extends Config {
+            public function gitHubRepository(): string
+            {
+                return 'default/repo';
+            }
+        };
+        $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('The release was deleted, but the tag remains. Retry with: imbo-releaser delete --tag-only -- '.escapeshellarg('1.0.0'));
+        $this->expectExceptionMessage('The release was deleted, but the tag remains. Retry with: imbo-releaser delete --repository '.escapeshellarg('owner/repo').' --tag-only -- '.escapeshellarg('1.0.0'));
         $commandTester->execute(['--repository' => 'owner/repo', 'version' => '1.0.0'], ['interactive' => false]);
     }
 
@@ -199,8 +205,9 @@ class DeleteReleaseTest extends TestCase
         $this->assertCount(0, $history);
     }
 
-    public function testRecoveryCommandQuotesTag(): void
+    public function testRecoveryCommandQuotesRepositoryAndTag(): void
     {
+        $repository = "owner/repo'&";
         $version = "-release'&v1.2.3";
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['id' => 42, 'tag_name' => $version])), // release by tag
@@ -210,8 +217,28 @@ class DeleteReleaseTest extends TestCase
         $tester = new CommandTester($this->createCommand($guzzleClient));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Retry with: imbo-releaser delete --tag-only -- '.escapeshellarg($version));
-        $tester->execute(['--repository' => 'owner/repo', 'version' => $version], ['interactive' => false]);
+        $this->expectExceptionMessage('Retry with: imbo-releaser delete --repository '.escapeshellarg($repository).' --tag-only -- '.escapeshellarg($version));
+        $tester->execute(['--repository' => $repository, 'version' => $version], ['interactive' => false]);
+    }
+
+    public function testRecoveryCommandUsesConfiguredRepository(): void
+    {
+        $config = new class extends Config {
+            public function gitHubRepository(): string
+            {
+                return 'configured/repo';
+            }
+        };
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => '1.0.0'])),
+            new Response(204), // delete release
+            new Response(500), // delete tag
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient, $config));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Retry with: imbo-releaser delete --repository '.escapeshellarg('configured/repo').' --tag-only -- '.escapeshellarg('1.0.0'));
+        $tester->execute(['version' => '1.0.0'], ['interactive' => false]);
     }
 
     public function testInteractPromptsForReleaseWhenNoVersionGiven(): void
