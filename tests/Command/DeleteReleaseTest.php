@@ -16,6 +16,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
+use const PHP_INT_MAX;
+
 #[CoversClass(DeleteRelease::class)]
 class DeleteReleaseTest extends TestCase
 {
@@ -41,6 +43,31 @@ class DeleteReleaseTest extends TestCase
         $this->expectExceptionMessage('Invalid version "01.2.3"');
         try {
             $commandTester->execute(['--repository' => 'owner/repo', 'version' => '01.2.3'], ['interactive' => false]);
+        } finally {
+            $this->assertCount(0, $history);
+        }
+    }
+
+    /**
+     * @return iterable<string,array{tagOnly:bool}>
+     */
+    public static function oversizedVersionDeletionProvider(): iterable
+    {
+        yield 'release and tag' => ['tagOnly' => false];
+        yield 'tag only' => ['tagOnly' => true];
+    }
+
+    #[DataProvider('oversizedVersionDeletionProvider')]
+    public function testOversizedVersionIsRejectedBeforeAnyRequest(bool $tagOnly): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient();
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionCode(DeleteRelease::INVALID);
+        $this->expectExceptionMessage('maximum supported integer');
+        try {
+            $tester->execute(['--repository' => 'owner/repo', '--tag-only' => $tagOnly, 'version' => 'v1.2.'.PHP_INT_MAX.'0'], ['interactive' => false]);
         } finally {
             $this->assertCount(0, $history);
         }
@@ -107,6 +134,18 @@ class DeleteReleaseTest extends TestCase
         $this->assertCount(1, $history);
         $this->assertSame('DELETE', $history[0]['request']->getMethod());
         $this->assertSame('/repos/owner/repo/git/refs/tags/v1.2.3-0', (string) $history[0]['request']->getUri());
+    }
+
+    public function testDeleteTagOnlyPreservesOversizedPrereleaseSequence(): void
+    {
+        $tag = 'v1.2.3-rc.'.PHP_INT_MAX.'0';
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => $tag], ['interactive' => false]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertCount(1, $history);
+        $this->assertSame('/repos/owner/repo/git/refs/tags/'.$tag, (string) $history[0]['request']->getUri());
     }
 
     public function testDeleteTagOnly(): void

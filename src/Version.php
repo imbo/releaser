@@ -3,9 +3,12 @@
 namespace ImboReleaser;
 
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use Stringable;
 
 use function sprintf;
+
+use const PHP_INT_MAX;
 
 final class Version implements Stringable
 {
@@ -30,16 +33,28 @@ final class Version implements Stringable
 
     public function incrementMajor(): self
     {
+        if (PHP_INT_MAX === $this->major) {
+            throw new RuntimeException(sprintf('Cannot increment major version component beyond the maximum supported integer (%d): "%s"', PHP_INT_MAX, $this));
+        }
+
         return new self($this->prefix, $this->major + 1, 0, 0);
     }
 
     public function incrementMinor(): self
     {
+        if (PHP_INT_MAX === $this->minor) {
+            throw new RuntimeException(sprintf('Cannot increment minor version component beyond the maximum supported integer (%d): "%s"', PHP_INT_MAX, $this));
+        }
+
         return new self($this->prefix, $this->major, $this->minor + 1, 0);
     }
 
     public function incrementPatch(): self
     {
+        if (PHP_INT_MAX === $this->patch) {
+            throw new RuntimeException(sprintf('Cannot increment patch version component beyond the maximum supported integer (%d): "%s"', PHP_INT_MAX, $this));
+        }
+
         return new self($this->prefix, $this->major, $this->minor, $this->patch + 1);
     }
 
@@ -78,17 +93,27 @@ final class Version implements Stringable
         return null !== $this->prerelease;
     }
 
+    /**
+     * @throws RuntimeException if a matching sequence cannot be represented as an integer
+     */
     public function prereleaseNumber(string $identifier): ?int
     {
         if (!preg_match('/^'.preg_quote($identifier, '/').'\.(\d+)$/D', $this->prerelease ?? '', $matches)) {
             return null;
         }
 
-        return (int) $matches[1];
+        $number = (int) $matches[1];
+        if ($matches[1] !== (string) $number) {
+            throw new RuntimeException(sprintf('Prerelease sequence exceeds the maximum supported integer (%d): "%s"', PHP_INT_MAX, $this));
+        }
+
+        return $number;
     }
 
     /**
      * Parse a semantic version with an optional prefix containing no whitespace.
+     *
+     * Major, minor, and patch components must fit within PHP's integer range.
      *
      * @throws InvalidArgumentException
      */
@@ -111,6 +136,13 @@ final class Version implements Stringable
         // SemVer forbids leading zeros in every purely numeric prerelease identifier.
         if (preg_match('/(?:^|\.)0[0-9]+(?:\.|$)/D', $matches['prerelease'] ?? '')) {
             throw new InvalidArgumentException(sprintf('Invalid version string: "%s"', $version));
+        }
+
+        foreach (['major', 'minor', 'patch'] as $component) {
+            // An overflowing integer cast silently clamps the value instead of rejecting it.
+            if ($matches[$component] !== (string) (int) $matches[$component]) {
+                throw new InvalidArgumentException(sprintf('Version %s component exceeds the maximum supported integer (%d): "%s"', $component, PHP_INT_MAX, $version));
+            }
         }
 
         return new self(

@@ -24,6 +24,8 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 use function sprintf;
 
+use const PHP_INT_MAX;
+
 #[CoversClass(CreateRelease::class)]
 class CreateReleaseTest extends TestCase
 {
@@ -805,6 +807,51 @@ class CreateReleaseTest extends TestCase
 
         $this->assertSame(CreateRelease::SUCCESS, $commandTester->getStatusCode());
         $this->assertStringContainsString('with tag "v0.1.0-rc.2"', $commandTester->getDisplay());
+    }
+
+    /**
+     * @return iterable<string,array{tag:string,title:string,prerelease:?string,message:string}>
+     */
+    public static function versionOverflowProvider(): iterable
+    {
+        yield 'major increment' => ['tag' => 'v'.PHP_INT_MAX.'.0.0', 'title' => 'feat!: breaking change', 'prerelease' => null, 'message' => 'Cannot increment major version component'];
+        yield 'minor increment' => ['tag' => 'v1.'.PHP_INT_MAX.'.0', 'title' => 'feat: new feature', 'prerelease' => null, 'message' => 'Cannot increment minor version component'];
+        yield 'patch increment' => ['tag' => 'v1.2.'.PHP_INT_MAX, 'title' => 'fix: a bug', 'prerelease' => null, 'message' => 'Cannot increment patch version component'];
+        yield 'prerelease increment' => ['tag' => 'v0.1.0-rc.'.PHP_INT_MAX, 'title' => 'fix: a bug', 'prerelease' => 'rc', 'message' => 'Cannot increment prerelease sequence'];
+        yield 'oversized prerelease sequence' => ['tag' => 'v0.1.0-rc.'.PHP_INT_MAX.'0', 'title' => 'fix: a bug', 'prerelease' => 'rc', 'message' => 'Prerelease sequence exceeds the maximum supported integer'];
+    }
+
+    #[DataProvider('versionOverflowProvider')]
+    public function testVersionOverflowStopsBeforeWriting(string $tag, string $title, ?string $prerelease, string $message): void
+    {
+        $commits = [['sha' => 'merge1']];
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => $title,
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => 'main'],
+                'merge_commit_sha' => 'merge1',
+            ]])),
+            new Response(200, [], $this->json([['name' => $tag, 'commit' => ['sha' => 'tagSha']]])),
+            // Prerelease-only histories use snapshot commits; stable tags use a comparison.
+            new Response(200, [], $this->json(null === $prerelease ? ['commits' => $commits] : $commits)),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $input = ['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true];
+        if (null !== $prerelease) {
+            $input['--prerelease'] = $prerelease;
+        }
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage($message);
+        try {
+            $tester->execute($input, ['interactive' => false]);
+        } finally {
+            $this->assertCount(4, $history);
+            foreach ($history as $transaction) {
+                $this->assertSame('GET', $transaction['request']->getMethod());
+            }
+        }
     }
 
     public function testRejectsExistingTagExcludedByFilter(): void
