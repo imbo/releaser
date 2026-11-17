@@ -275,6 +275,14 @@ The next version is determined automatically based on the Conventional Commit ty
 
 If no matching stable tag is found for the selected branch after applying your tag filter, the configured `initialVersion()` is used (default `v0.1.0`). This also applies when only prerelease tags exist.
 
+### Numeric limits
+
+Major, minor, and patch components must not exceed PHP's `PHP_INT_MAX` (`9223372036854775807` on 64-bit PHP). Tags with larger components are ignored when scanning the repository. Explicitly supplying one to `delete`, including with `--tag-only`, returns exit code `2` before making API requests; the version is never silently changed to fit the limit.
+
+Release creation fails with exit code `1` before creating a tag or release if a required version increment would exceed this limit, or if the matching prerelease sequence number is already at or above the limit.
+
+Prerelease suffixes and build metadata are otherwise preserved as text. Provided their major, minor, and patch components are within range, tags with oversized prerelease sequence numbers can still be listed and deleted using their exact names; only continuing the matching prerelease sequence fails.
+
 ## Maintainer release procedure
 
 If dependency updates are intended for the release, update them deliberately and review the lockfile changes before committing them:
