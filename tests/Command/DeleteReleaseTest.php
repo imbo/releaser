@@ -12,6 +12,7 @@ use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\TestHttpClientTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -285,6 +286,88 @@ class DeleteReleaseTest extends TestCase
         $this->assertCount(4, $history);
         $this->assertSame('/repos/owner/repo/releases/42', (string) $history[2]['request']->getUri());
         $this->assertSame('/repos/owner/repo/git/refs/tags/v1.0.0', (string) $history[3]['request']->getUri());
+    }
+
+    /**
+     * @return iterable<string,array{status:int,interactive:bool}>
+     */
+    public static function missingTagProvider(): iterable
+    {
+        yield '404, explicit version' => ['status' => 404, 'interactive' => false];
+        yield '422, explicit version' => ['status' => 422, 'interactive' => false];
+        yield '404, interactive selection' => ['status' => 404, 'interactive' => true];
+        yield '422, interactive selection' => ['status' => 422, 'interactive' => true];
+    }
+
+    #[DataProvider('missingTagProvider')]
+    public function testDeleteDraftWithoutTagSucceeds(int $status, bool $interactive): void
+    {
+        $responses = $interactive ? [] : [new Response(404)]; // release by tag
+        $responses[] = new Response(200, [], $this->json([[
+            'id' => 42, 'name' => 'Draft', 'tag_name' => 'v1.0.0', 'draft' => true,
+            'html_url' => 'url', 'created_at' => '2026-01-01T00:00:00Z',
+        ]])); // releases
+        $responses[] = new Response(204); // delete release
+        $responses[] = new Response($status); // delete tag
+        $responses[] = new Response(404); // confirm absence
+        [$guzzleClient, $history] = $this->getGuzzleClient(...$responses);
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $input = ['--repository' => 'owner/repo'];
+        if ($interactive) {
+            $tester->setInputs(['v1.0.0', 'yes']);
+        } else {
+            $input['version'] = 'v1.0.0';
+        }
+        $tester->execute($input, ['interactive' => $interactive]);
+
+        $this->assertSame(DeleteRelease::SUCCESS, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Successfully deleted release v1.0.0', $display);
+        $this->assertStringContainsString('Tag v1.0.0 does not exist; nothing to delete.', $display);
+        $this->assertStringNotContainsString('Successfully deleted tag', $display);
+        $this->assertStringNotContainsString('Retry with:', $display);
+        $requestCount = $interactive ? 4 : 5;
+        $this->assertCount($requestCount, $history);
+        $this->assertSame('GET', $history[$requestCount - 1]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/git/ref/tags/v1.0.0', (string) $history[$requestCount - 1]['request']->getUri());
+    }
+
+    #[DataProvider('missingTagProvider')]
+    public function testTagOnlyDoesNotIgnoreMissingTag(int $status, bool $interactive): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response($status));
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->setInputs(['yes']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete tag reference "v1.0.0"');
+        try {
+            $tester->execute(['--repository' => 'owner/repo', '--tag-only' => true, 'version' => 'v1.0.0'], ['interactive' => $interactive]);
+        } finally {
+            $this->assertCount(1, $history);
+            $this->assertSame('DELETE', $history[0]['request']->getMethod());
+        }
+    }
+
+    public function testFailedTagVerificationDoesNotReportSuccess(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['id' => 42, 'tag_name' => 'v1.0.0'])),
+            new Response(204), // delete release
+            new Response(422), // delete tag
+            new Response(403), // checking absence is denied
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Retry with: imbo-releaser delete --repository '.escapeshellarg('owner/repo').' --tag-only -- '.escapeshellarg('v1.0.0'));
+        try {
+            $tester->execute(['--repository' => 'owner/repo', 'version' => 'v1.0.0'], ['interactive' => false]);
+        } finally {
+            $this->assertCount(4, $history);
+            $this->assertStringNotContainsString('Successfully deleted tag', $tester->getDisplay());
+            $this->assertStringNotContainsString('nothing to delete', $tester->getDisplay());
+        }
     }
 
     public function testDoesNotReuseSelectedReleaseOnNextRun(): void
