@@ -12,6 +12,7 @@ use function dirname;
 
 use const PHP_BINARY;
 use const PHP_EOL;
+use const PHP_INT_MAX;
 
 #[CoversNothing]
 class EntrypointTest extends TestCase
@@ -52,6 +53,8 @@ class EntrypointTest extends TestCase
         yield 'extra argument' => ['arguments' => ['list', 'extra'], 'message' => 'No arguments expected'];
         yield 'invalid repository' => ['arguments' => ['list', '--repository', 'owner/'], 'message' => 'Invalid repository string'];
         yield 'invalid version' => ['arguments' => ['delete', '--repository', 'owner/repo', 'invalid'], 'message' => 'Invalid version'];
+        yield 'oversized release version' => ['arguments' => ['delete', '--repository', 'owner/repo', 'v1.2.'.PHP_INT_MAX.'0'], 'message' => 'maximum supported integer'];
+        yield 'oversized tag version' => ['arguments' => ['delete', '--repository', 'owner/repo', '--tag-only', 'v1.2.'.PHP_INT_MAX.'0'], 'message' => 'maximum supported integer'];
         yield 'invalid template' => ['arguments' => ['create', '--repository', 'owner/repo', '--branch', 'main', '--template', '/missing/template.twig'], 'message' => 'specified template file'];
         yield 'invalid prerelease' => ['arguments' => ['create', '--repository', 'owner/repo', '--branch', 'main', '--prerelease', '01'], 'message' => 'Invalid prerelease identifier'];
         yield 'create repository' => ['arguments' => ['create', '--branch', 'main'], 'message' => 'Specify a GitHub repository'];

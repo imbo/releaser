@@ -3,11 +3,14 @@
 namespace ImboReleaser;
 
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 use function sprintf;
+
+use const PHP_INT_MAX;
 
 #[CoversClass(Version::class)]
 class VersionTest extends TestCase
@@ -41,6 +44,56 @@ class VersionTest extends TestCase
         $version = new Version('v', 1, 2, 3);
         $this->assertSame('v1.2.4', (string) $version->incrementPatch());
         $this->assertSame('v1.2.3', (string) $version, 'Original version should be immutable');
+    }
+
+    /**
+     * @return iterable<string,array{method:'incrementMajor'|'incrementMinor'|'incrementPatch',component:'major'|'minor'|'patch'}>
+     */
+    public static function incrementMethodProvider(): iterable
+    {
+        yield 'major' => ['method' => 'incrementMajor', 'component' => 'major'];
+        yield 'minor' => ['method' => 'incrementMinor', 'component' => 'minor'];
+        yield 'patch' => ['method' => 'incrementPatch', 'component' => 'patch'];
+    }
+
+    /**
+     * @param 'incrementMajor'|'incrementMinor'|'incrementPatch' $method
+     */
+    #[DataProvider('incrementMethodProvider')]
+    public function testIncrementRejectsOverflow(string $method, string $component): void
+    {
+        $version = new Version('v', PHP_INT_MAX, PHP_INT_MAX, PHP_INT_MAX);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Cannot increment %s version component beyond the maximum supported integer (%d)', $component, PHP_INT_MAX));
+        $version->$method();
+    }
+
+    public function testIncrementsCanReachIntegerLimit(): void
+    {
+        $this->assertSame('v'.PHP_INT_MAX.'.0.0', (string) (new Version('v', PHP_INT_MAX - 1, PHP_INT_MAX, PHP_INT_MAX))->incrementMajor());
+        $this->assertSame('v1.'.PHP_INT_MAX.'.0', (string) (new Version('v', 1, PHP_INT_MAX - 1, PHP_INT_MAX))->incrementMinor());
+        $this->assertSame('v1.2.'.PHP_INT_MAX, (string) (new Version('v', 1, 2, PHP_INT_MAX - 1))->incrementPatch());
+    }
+
+    public function testPrereleaseSequenceCanReachIntegerLimit(): void
+    {
+        $version = Version::fromString('v1.2.3')->withPrerelease('rc', PHP_INT_MAX);
+
+        $this->assertSame('v1.2.3-rc.'.PHP_INT_MAX, (string) $version);
+        $this->assertSame(PHP_INT_MAX, $version->prereleaseNumber('rc'));
+    }
+
+    public function testOversizedPrereleaseSequenceIsPreservedButCannotBeUsedAsInteger(): void
+    {
+        $tag = 'v1.2.3-rc.'.PHP_INT_MAX.'0';
+        $version = Version::fromString($tag);
+        $this->assertSame($tag, (string) $version);
+        $this->assertNull($version->prereleaseNumber('beta'));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Prerelease sequence exceeds the maximum supported integer (%d)', PHP_INT_MAX));
+        $version->prereleaseNumber('rc');
     }
 
     public function testIncrementPreservesPrefix(): void
@@ -182,6 +235,9 @@ class VersionTest extends TestCase
      */
     public static function fromStringProvider(): iterable
     {
+        foreach (['v'.PHP_INT_MAX.'.2.3', 'v1.'.PHP_INT_MAX.'.3', 'v1.2.'.PHP_INT_MAX] as $version) {
+            yield 'maximum integer: '.$version => ['input' => $version, 'expected' => $version];
+        }
         yield 'build metadata' => ['input' => 'v1.2.3+build.4', 'expected' => 'v1.2.3+build.4'];
         yield 'numeric build metadata' => ['input' => '1.2.3+001.0', 'expected' => '1.2.3+001.0'];
         yield 'zero build metadata' => ['input' => 'v1.2.3+0', 'expected' => 'v1.2.3+0'];
@@ -230,6 +286,28 @@ class VersionTest extends TestCase
     public function testFromString(string $input, string $expected): void
     {
         $this->assertSame($expected, (string) Version::fromString($input));
+    }
+
+    /**
+     * @return iterable<string,array{input:string,component:string}>
+     */
+    public static function overflowingVersionProvider(): iterable
+    {
+        $oversized = PHP_INT_MAX.'0';
+        yield 'major' => ['input' => 'v'.$oversized.'.2.3', 'component' => 'major'];
+        yield 'minor' => ['input' => 'v1.'.$oversized.'.3', 'component' => 'minor'];
+        yield 'patch' => ['input' => 'v1.2.'.$oversized, 'component' => 'patch'];
+        yield 'very large component' => ['input' => 'v1.2.'.str_repeat('9', 100), 'component' => 'patch'];
+        yield 'custom prefix and suffixes' => ['input' => 'release-1.'.$oversized.'.3-rc.1+build.2', 'component' => 'minor'];
+    }
+
+    #[DataProvider('overflowingVersionProvider')]
+    public function testRejectsCoreComponentOutsideIntegerRange(string $input, string $component): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Version %s component exceeds the maximum supported integer (%d)', $component, PHP_INT_MAX));
+
+        Version::fromString($input);
     }
 
     /**

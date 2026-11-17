@@ -32,6 +32,8 @@ use function dirname;
 use function sprintf;
 use function usort;
 
+use const PHP_INT_MAX;
+
 #[AsCommand(
     name: CreateRelease::NAME,
     description: 'Create a new release',
@@ -425,6 +427,10 @@ class CreateRelease extends BaseCommand
             }
 
             $number = max($number, $tag->version->prereleaseNumber($identifier) ?? 0);
+        }
+
+        if (PHP_INT_MAX === $number) {
+            throw new RuntimeException(sprintf('Cannot increment prerelease sequence beyond the maximum supported integer (%d) for version "%s" and identifier "%s".', PHP_INT_MAX, $version, $identifier));
         }
 
         return $version->withPrerelease($identifier, $number + 1);
