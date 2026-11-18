@@ -46,7 +46,7 @@ final class Client
     public function getBranches(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/branches?per_page=100', $repository),
+            sprintf('%s/branches?per_page=100', $this->repositoryPath($repository)),
             Branch::fromAPI(...),
         );
     }
@@ -61,7 +61,7 @@ final class Client
     public function getReleases(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/releases?per_page=100', $repository),
+            sprintf('%s/releases?per_page=100', $this->repositoryPath($repository)),
             Release::fromAPI(...),
         );
     }
@@ -76,7 +76,7 @@ final class Client
     public function getTags(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/tags?per_page=100', $repository),
+            sprintf('%s/tags?per_page=100', $this->repositoryPath($repository)),
             Tag::fromAPI(...),
         );
     }
@@ -95,7 +95,7 @@ final class Client
     public function getAllMergedPullRequests(Repository $repository): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/pulls?state=closed&sort=created&direction=desc&per_page=100', $repository),
+            sprintf('%s/pulls?state=closed&sort=created&direction=desc&per_page=100', $this->repositoryPath($repository)),
             PullRequest::fromAPI(...),
             static function (array $item): bool {
                 return
@@ -118,7 +118,7 @@ final class Client
     public function getCommitShas(Repository $repository, string $head): iterable
     {
         return $this->fetchPaginated(
-            sprintf('/repos/%s/commits?sha=%s&per_page=100', $repository, rawurlencode($head)),
+            sprintf('%s/commits?sha=%s&per_page=100', $this->repositoryPath($repository), rawurlencode($head)),
             static function (array $commit): string {
                 if (!is_string($commit['sha'] ?? null) || '' === $commit['sha']) {
                     throw new RuntimeException('Missing or invalid commit "sha" in GitHub commits response.');
@@ -140,7 +140,7 @@ final class Client
      */
     public function getCommitShasBetween(Repository $repository, string $base, string $head): iterable
     {
-        $url = sprintf('/repos/%s/compare/%s...%s?per_page=100', $repository, rawurlencode($base), rawurlencode($head));
+        $url = sprintf('%s/compare/%s...%s?per_page=100', $this->repositoryPath($repository), rawurlencode($base), rawurlencode($head));
         while (null !== $url) {
             [$data, $url] = $this->getJsonAsArray($url);
             $commits = $data['commits'] ?? null;
@@ -168,7 +168,7 @@ final class Client
     public function getShaDateTime(Repository $repository, string $sha): DateTimeImmutable
     {
         try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/git/commits/%s', $repository, $sha));
+            $response = $this->httpClient->request('GET', sprintf('%s/git/commits/%s', $this->repositoryPath($repository), $sha));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to get commit data for "%s", got: "%s"', $sha, $this->responseStatus($e)), previous: $e);
         }
@@ -210,7 +210,7 @@ final class Client
         $this->createAnnotatedTag($repository, $commitSha, $version, $releaseNotes);
 
         try {
-            $response = $this->httpClient->request('POST', sprintf('/repos/%s/releases', $repository), [
+            $response = $this->httpClient->request('POST', sprintf('%s/releases', $this->repositoryPath($repository)), [
                 'json' => [
                     'tag_name' => (string) $version,
                     'name' => $name ?? (string) $version,
@@ -245,7 +245,7 @@ final class Client
     public function deleteRelease(Repository $repository, Version $version): void
     {
         try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/releases/tags/%s', $repository, rawurlencode((string) $version)));
+            $response = $this->httpClient->request('GET', sprintf('%s/releases/tags/%s', $this->repositoryPath($repository), rawurlencode((string) $version)));
         } catch (TransferException $e) {
             if ($e instanceof ResponseException && 404 === $e->getResponse()->getStatusCode()) {
                 foreach ($this->getReleases($repository) as $release) {
@@ -283,7 +283,7 @@ final class Client
     public function deleteReleaseById(Repository $repository, int $releaseId): void
     {
         try {
-            $this->httpClient->request('DELETE', sprintf('/repos/%s/releases/%d', $repository, $releaseId));
+            $this->httpClient->request('DELETE', sprintf('%s/releases/%d', $this->repositoryPath($repository), $releaseId));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to delete GitHub release with ID %d in repository "%s", got: "%s"', $releaseId, $repository, $this->responseStatus($e)), previous: $e);
         }
@@ -304,7 +304,7 @@ final class Client
     public function deleteTag(Repository $repository, Version $version, bool $allowMissing = false): bool
     {
         try {
-            $this->httpClient->request('DELETE', sprintf('/repos/%s/git/refs/tags/%s', $repository, rawurlencode((string) $version)));
+            $this->httpClient->request('DELETE', sprintf('%s/git/refs/tags/%s', $this->repositoryPath($repository), rawurlencode((string) $version)));
         } catch (TransferException $e) {
             if ($allowMissing
                 && $e instanceof ResponseException
@@ -330,7 +330,7 @@ final class Client
     public function getBranchSha(Repository $repository, Branch $branch): string
     {
         try {
-            $response = $this->httpClient->request('GET', sprintf('/repos/%s/branches/%s', $repository, rawurlencode($branch->name)));
+            $response = $this->httpClient->request('GET', sprintf('%s/branches/%s', $this->repositoryPath($repository), rawurlencode($branch->name)));
         } catch (TransferException $e) {
             throw new RuntimeException(sprintf('Failed to request branch data from the GitHub API for branch "%s", got: "%s"', $branch->name, $this->responseStatus($e)), previous: $e);
         }
@@ -353,7 +353,7 @@ final class Client
     private function tagExists(Repository $repository, Version $version): bool
     {
         try {
-            $this->httpClient->request('GET', sprintf('/repos/%s/git/ref/tags/%s', $repository, rawurlencode((string) $version)));
+            $this->httpClient->request('GET', sprintf('%s/git/ref/tags/%s', $this->repositoryPath($repository), rawurlencode((string) $version)));
         } catch (TransferException $e) {
             if ($e instanceof ResponseException && 404 === $e->getResponse()->getStatusCode()) {
                 return false;
@@ -376,7 +376,7 @@ final class Client
     private function createAnnotatedTag(Repository $repository, string $commitSha, Version $version, string $releaseNotes): void
     {
         try {
-            $response = $this->httpClient->request('POST', sprintf('/repos/%s/git/tags', $repository), [
+            $response = $this->httpClient->request('POST', sprintf('%s/git/tags', $this->repositoryPath($repository)), [
                 'json' => [
                     'tag' => (string) $version,
                     'message' => $releaseNotes,
@@ -396,7 +396,7 @@ final class Client
         }
 
         try {
-            $this->httpClient->request('POST', sprintf('/repos/%s/git/refs', $repository), [
+            $this->httpClient->request('POST', sprintf('%s/git/refs', $this->repositoryPath($repository)), [
                 'json' => [
                     'ref' => sprintf('refs/tags/%s', $version),
                     'sha' => $tagData['sha'],
@@ -500,6 +500,11 @@ final class Client
         }
 
         return $data;
+    }
+
+    private function repositoryPath(Repository $repository): string
+    {
+        return sprintf('/repos/%s/%s', rawurlencode($repository->owner), rawurlencode($repository->repo));
     }
 
     private function responseStatus(TransferException $exception): string

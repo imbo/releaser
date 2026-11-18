@@ -35,6 +35,13 @@ class RepositoryTest extends TestCase
         yield 'repository contains whitespace' => ['repository' => 'owner/repo name'];
         yield 'additional path segment' => ['repository' => 'owner/repo/path'];
         yield 'trailing newline' => ['repository' => "owner/repo\n"];
+        foreach (['#123', '?example', '%23', '\\', ':', '@', "'", '&', "\0"] as $suffix) {
+            yield 'owner URL delimiter '.bin2hex($suffix) => ['repository' => 'owner'.$suffix.'/repo'];
+            yield 'repository URL delimiter '.bin2hex($suffix) => ['repository' => 'owner/repo'.$suffix];
+        }
+        yield 'owner dot segment' => ['repository' => '../repo'];
+        yield 'repository dot segment' => ['repository' => 'owner/.'];
+        yield 'repository parent segment' => ['repository' => 'owner/..'];
     }
 
     #[DataProvider('invalidRepositoryProvider')]
@@ -51,9 +58,53 @@ class RepositoryTest extends TestCase
         $this->assertFalse(Repository::isValid($repository));
     }
 
-    public function testValidRepositoryStringIsValid(): void
+    /**
+     * @return iterable<string,array{owner:string,repo:string}>
+     */
+    public static function invalidRepositoryComponentsProvider(): iterable
     {
-        $this->assertTrue(Repository::isValid('imbo/releaser'));
+        yield 'empty owner' => ['owner' => '', 'repo' => 'repo'];
+        yield 'empty repository' => ['owner' => 'owner', 'repo' => ''];
+        yield 'owner path separator' => ['owner' => 'owner/other', 'repo' => 'repo'];
+        yield 'repository path separator' => ['owner' => 'owner', 'repo' => 'repo/other'];
+        yield 'leading owner hyphen' => ['owner' => '-owner', 'repo' => 'repo'];
+        yield 'trailing owner hyphen' => ['owner' => 'owner-', 'repo' => 'repo'];
+
+        foreach (self::invalidRepositoryProvider() as $name => ['repository' => $repository]) {
+            if (1 === substr_count($repository, '/')) {
+                [$owner, $repo] = explode('/', $repository);
+                yield $name => ['owner' => $owner, 'repo' => $repo];
+            }
+        }
+    }
+
+    #[DataProvider('invalidRepositoryComponentsProvider')]
+    public function testConstructorRejectsInvalidComponents(string $owner, string $repo): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('expected format "owner/repo"');
+        new Repository($owner, $repo);
+    }
+
+    /**
+     * @return iterable<string,array{repository:string}>
+     */
+    public static function validRepositoryProvider(): iterable
+    {
+        yield 'simple' => ['repository' => 'imbo/releaser'];
+        yield 'single characters' => ['repository' => 'a/b'];
+        yield 'mixed case and punctuation' => ['repository' => 'My-Org/My_Repo.v1-2'];
+        yield 'enterprise managed user' => ['repository' => 'user_shortcode/repo'];
+        yield 'dot prefix' => ['repository' => 'owner/.github'];
+        yield 'hyphen prefix' => ['repository' => 'owner/-repo'];
+        yield 'consecutive dots' => ['repository' => 'owner/repo..name'];
+    }
+
+    #[DataProvider('validRepositoryProvider')]
+    public function testValidRepositoryStringIsValid(string $repository): void
+    {
+        $this->assertTrue(Repository::isValid($repository));
+        $this->assertSame($repository, (string) Repository::fromString($repository));
     }
 
     public function testUrl(): void

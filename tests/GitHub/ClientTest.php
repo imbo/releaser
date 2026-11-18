@@ -38,6 +38,20 @@ class ClientTest extends TestCase
         $this->assertSame([], $tags);
     }
 
+    public function testTagDeletionTargetsTheExactRepositoryPath(): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+
+        (new Client($guzzleClient))->deleteTag(Repository::fromString('My-Org/My_Repo.v1-2'), Version::fromString('v1.0.0'));
+
+        $this->assertCount(1, $history);
+        $request = $history[0]['request'];
+        $this->assertSame('DELETE', $request->getMethod());
+        $this->assertSame('/repos/My-Org/My_Repo.v1-2/git/refs/tags/v1.0.0', $request->getRequestTarget());
+        $this->assertSame('', $request->getUri()->getQuery());
+        $this->assertSame('', $request->getUri()->getFragment());
+    }
+
     public function testGetBranches(): void
     {
         [$guzzleClient, $history] = $this->getGuzzleClient(

@@ -23,6 +23,32 @@ class DeleteReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
 
+    /**
+     * @return iterable<string,array{repository:string,tagOnly:bool}>
+     */
+    public static function unsafeRepositoryDeletionProvider(): iterable
+    {
+        foreach (['owner/repo#123', 'owner/repo?example', 'owner/repo%23fragment', 'owner/..'] as $repository) {
+            yield $repository.' release and tag' => ['repository' => $repository, 'tagOnly' => false];
+            yield $repository.' tag only' => ['repository' => $repository, 'tagOnly' => true];
+        }
+    }
+
+    #[DataProvider('unsafeRepositoryDeletionProvider')]
+    public function testUnsafeRepositoryIsRejectedBeforeAnyRequest(string $repository, bool $tagOnly): void
+    {
+        [$guzzleClient, $history] = $this->getGuzzleClient(new Response(204));
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionCode(DeleteRelease::INVALID);
+        try {
+            $tester->execute(['--repository' => $repository, '--tag-only' => $tagOnly, 'version' => 'v1.0.0'], ['interactive' => false]);
+        } finally {
+            $this->assertCount(0, $history);
+        }
+    }
+
     public function testInvalidVersionArgument(): void
     {
         [$guzzleClient] = $this->getGuzzleClient();
@@ -247,7 +273,7 @@ class DeleteReleaseTest extends TestCase
 
     public function testRecoveryCommandQuotesRepositoryAndTag(): void
     {
-        $repository = "owner/repo'&";
+        $repository = 'owner/repo';
         $version = "-release'&v1.2.3";
         [$guzzleClient] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['id' => 42, 'tag_name' => $version])), // release by tag
