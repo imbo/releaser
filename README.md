@@ -50,6 +50,8 @@ Once installed you can see the available commands and documentation by running t
 
 The commands described below share a few common options, most notably `--repository` / `-r` for specifying the GitHub repository and `--config` / `-c` for pointing to a configuration file. If you omit `--config`, the application looks for a configuration file in the [locations described below](#where-the-configuration-is-loaded-from). If you omit `--repository`, it uses the repository from your configuration or asks you to enter one when running interactively. Run any command with `--help` to see all available options and arguments.
 
+Specify repositories as plain `owner/repo` names, not URLs or URL-encoded values. Owners may contain ASCII letters, digits, and internal hyphens or underscores (for Enterprise Managed Users); repository names may contain ASCII letters, digits, dots, underscores, and hyphens, but cannot be `.` or `..`. Invalid names, including query strings and fragments such as `owner/repo#123`, are rejected with exit code `2` before any API request.
+
 For non-interactive environments such as CI, pass `--no-interaction` (or `-n`) and provide every value that would otherwise be prompted for. For example:
 
 ```bash

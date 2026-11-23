@@ -52,6 +52,8 @@ class EntrypointTest extends TestCase
         yield 'missing option value' => ['arguments' => ['create', '--branch'], 'message' => 'requires a value'];
         yield 'extra argument' => ['arguments' => ['list', 'extra'], 'message' => 'No arguments expected'];
         yield 'invalid repository' => ['arguments' => ['list', '--repository', 'owner/'], 'message' => 'Invalid repository string'];
+        yield 'repository fragment during tag deletion' => ['arguments' => ['delete', '--repository', 'owner/repo#123', '--tag-only', 'v1.0.0'], 'message' => 'Invalid repository string'];
+        yield 'repository query during tag deletion' => ['arguments' => ['delete', '--repository', 'owner/repo?example', '--tag-only', 'v1.0.0'], 'message' => 'Invalid repository string'];
         yield 'invalid version' => ['arguments' => ['delete', '--repository', 'owner/repo', 'invalid'], 'message' => 'Invalid version'];
         yield 'oversized release version' => ['arguments' => ['delete', '--repository', 'owner/repo', 'v1.2.'.PHP_INT_MAX.'0'], 'message' => 'maximum supported integer'];
         yield 'oversized tag version' => ['arguments' => ['delete', '--repository', 'owner/repo', '--tag-only', 'v1.2.'.PHP_INT_MAX.'0'], 'message' => 'maximum supported integer'];
