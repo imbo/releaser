@@ -82,6 +82,8 @@ Pass `--dry-run` to preview the calculated release and release notes without cre
 
 If no eligible pull requests are found, run `create` with `-v` to see which pull requests were skipped and why. Reasons include invalid Conventional Commit messages, configuration filters, missing merge commit IDs, commits outside the branch snapshot, or commits already included in the previous tag.
 
+If release creation reports an error after creating a tag, inspect GitHub releases, including drafts, before deleting the tag or retrying: the release may already exist despite the error. The application does not automatically retry creation or delete the tag.
+
 ### Example release workflow
 
 Imbo Releaser calculates the next version from the titles of merged pull requests. Use a [Conventional Commit](https://www.conventionalcommits.org/) title when creating a pull request:
