@@ -3,8 +3,10 @@
 namespace ImboReleaser\Command;
 
 use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use ImboReleaser\Config;
 use ImboReleaser\Config\Resolver;
@@ -23,6 +25,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
+use Throwable;
 
 use function sprintf;
 
@@ -1290,7 +1293,18 @@ class CreateReleaseTest extends TestCase
         $this->assertCount(4, $history);
     }
 
-    public function testReportsRecoveryCommandWhenReleaseCreationFails(): void
+    /**
+     * @return iterable<string,array{failure:Response|Throwable}>
+     */
+    public static function releaseCreationFailureProvider(): iterable
+    {
+        yield 'lost response' => ['failure' => new ConnectException('Response connection lost', new Request('POST', '/repos/owner/repo/releases'))];
+        yield 'server error' => ['failure' => new Response(503)];
+        yield 'rejected request' => ['failure' => new Response(422)];
+    }
+
+    #[DataProvider('releaseCreationFailureProvider')]
+    public function testWarnsToInspectReleasesBeforeTagCleanup(Response|Throwable $failure): void
     {
         $config = new class extends Config {
             public function gitHubRepository(): string
@@ -1303,7 +1317,7 @@ class CreateReleaseTest extends TestCase
                 return "-release'&v1.2.3";
             }
         };
-        [$guzzleClient] = $this->getGuzzleClient(
+        [$guzzleClient, $history] = $this->getGuzzleClient(
             new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])), // branch snapshot
             new Response(200, [], $this->json([[
                 'number' => 1,
@@ -1317,14 +1331,26 @@ class CreateReleaseTest extends TestCase
             new Response(200, [], $this->json([['sha' => 'merge1']])), // snapshot commits
             new Response(201, [], $this->json(['sha' => 'tagSha'])), // tag object creation
             new Response(201), // tag reference creation
-            new Response(422), // release creation
+            $failure, // release creation
         );
         $command = $this->createCommand($guzzleClient, $config);
         $commandTester = new CommandTester($command);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Delete the tag before retrying: imbo-releaser delete --repository '.escapeshellarg('owner/repo').' --tag-only -- '.escapeshellarg("-release'&v1.2.3"));
-        $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+        try {
+            $commandTester->execute(['--repository' => 'owner/repo', '--branch' => 'main', '--no-edit' => true], ['interactive' => false]);
+            $this->fail('Expected a release creation error.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('release creation could not be confirmed', $e->getMessage());
+            $this->assertStringContainsString('The release may already exist', $e->getMessage());
+            $this->assertStringContainsString('Inspect releases, including drafts, before deleting the tag or retrying', $e->getMessage());
+            $this->assertStringContainsString("Tag \"-release'&v1.2.3\"", $e->getMessage());
+            $this->assertStringContainsString('https://github.com/owner/repo/releases', $e->getMessage());
+            $this->assertStringContainsString('imbo-releaser list --repository '.escapeshellarg('owner/repo'), $e->getMessage());
+            $this->assertStringNotContainsString('--tag-only', $e->getMessage());
+        }
+        $this->assertCount(7, $history);
+        $this->assertSame('POST', $history[6]['request']->getMethod());
+        $this->assertSame('/repos/owner/repo/releases', $history[6]['request']->getRequestTarget());
     }
 
     public function testUserDeclinesConfirmation(): void
