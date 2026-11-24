@@ -50,6 +50,8 @@ try {
     $httpClient = new GuzzleHttpClient([
         'handler' => $handlerStack,
         'base_uri' => 'https://api.github.com',
+        'timeout' => 60,
+        'connect_timeout' => 10,
         'headers' => [
             'Accept' => 'application/vnd.github+json',
             'X-GitHub-Api-Version' => '2022-11-28',
