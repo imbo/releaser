@@ -277,6 +277,21 @@ The next version is determined automatically based on the Conventional Commit ty
 
 If no matching stable tag is found for the selected branch after applying your tag filter, the configured `initialVersion()` is used (default `v0.1.0`). This also applies when only prerelease tags exist.
 
+### Maintenance branch version bounds
+
+Release versions must stay within the version line named by a maintenance branch:
+
+| Branch names | Allowed release versions |
+| ------------ | ------------------------ |
+| `1`, `v1`, `1.x`, `v1.x` | `1.*.*` |
+| `1.2`, `v1.2`, `1.2.x`, `v1.2.x` | `1.2.*` |
+
+For example, a `feat:` pull request can produce `v1.3.0` on `1.x`, but not on `1.2.x`. A breaking change that requires `v2.0.0` cannot be released from either branch. The command fails with exit code `1` before creating a tag or release; it never silently reduces the required version bump to fit the branch.
+
+The same check applies to dry runs, prereleases, and initial releases. When creating the first release on a maintenance branch, configure `initialVersion()` to return a version within that branch's line. Prerelease suffixes, build metadata, and tag prefixes do not affect these numeric bounds.
+
+Configured main branches (`main` and `master` by default) and branches with custom names have no default version bounds. Override `validateVersionForBranch(Branch $branch, Version $version): void` in your configuration to customize the policy, keeping it consistent with `getLatestTagForBranch()`. Classes extending `Config` inherit the default check; configurations implementing `ConfigInterface` directly must implement this method too.
+
 ### Numeric limits
 
 Major, minor, and patch components must not exceed PHP's `PHP_INT_MAX` (`9223372036854775807` on 64-bit PHP). Tags with larger components are ignored when scanning the repository. Explicitly supplying one to `delete`, including with `--tag-only`, returns exit code `2` before making API requests; the version is never silently changed to fit the limit.

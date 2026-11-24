@@ -3,14 +3,17 @@
 namespace ImboReleaser;
 
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 
 use function dirname;
 use function in_array;
+use function sprintf;
 
 use const DIRECTORY_SEPARATOR;
+use const PHP_INT_MAX;
 
 class Config implements ConfigInterface
 {
@@ -86,6 +89,33 @@ class Config implements ConfigInterface
         }
 
         return $currentTag->version->incrementPatch();
+    }
+
+    /**
+     * Keep major maintenance branches within their major version, and minor branches within their
+     * minor version.
+     *
+     * Main branches and branches with custom names have no default version bounds. Override this
+     * method alongside getLatestTagForBranch() when using a different release-line policy.
+     *
+     * @throws RuntimeException
+     */
+    public function validateVersionForBranch(Branch $branch, Version $version): void
+    {
+        if ($this->isMainBranch($branch) || !preg_match('/^v?(\d+)(?:\.(\d+))?(?:\.x)?$/D', $branch->name, $matches)) {
+            return;
+        }
+
+        try {
+            $minimum = Version::fromString(sprintf('%s.%s.0', $matches[1], $matches[2] ?? '0'));
+            $maximum = Version::fromString(sprintf('%s.%s.%d', $matches[1], $matches[2] ?? (string) PHP_INT_MAX, PHP_INT_MAX));
+        } catch (InvalidArgumentException $e) {
+            throw new RuntimeException(sprintf('Maintenance branch "%s" does not name a supported version line.', $branch->name), previous: $e);
+        }
+
+        if (Version::LOWER === $version->compareTo($minimum) || Version::GREATER === $version->compareTo($maximum)) {
+            throw new RuntimeException(sprintf('Cannot release version "%s" from maintenance branch "%s": the version is outside its release line. Review the pull requests or initialVersion(), or select a compatible release branch.', $version, $branch->name));
+        }
     }
 
     public function getLatestTagForBranch(Branch $branch, array $tags): ?ReleaseTag

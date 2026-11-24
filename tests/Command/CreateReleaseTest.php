@@ -11,10 +11,12 @@ use ImboReleaser\Config\Resolver;
 use ImboReleaser\ConfigInterface;
 use ImboReleaser\Exception\InvalidArgumentException;
 use ImboReleaser\Exception\RuntimeException;
+use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\Client;
 use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
 use ImboReleaser\TestHttpClientTrait;
+use ImboReleaser\Version;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +32,197 @@ use const PHP_INT_MAX;
 class CreateReleaseTest extends TestCase
 {
     use TestHttpClientTrait;
+
+    /**
+     * @return iterable<string,array{branch:string,title:string,current:?string,expected:string,prerelease:?string,dryRun:bool}>
+     */
+    public static function incompatibleMaintenanceReleaseProvider(): iterable
+    {
+        foreach (['1', 'v1', '1.x', 'v1.x'] as $branch) {
+            yield $branch.' major bump' => ['branch' => $branch, 'title' => 'feat!: breaking change', 'current' => 'v1.2.3', 'expected' => 'v2.0.0', 'prerelease' => null, 'dryRun' => false];
+        }
+        foreach (['1.2', 'v1.2', '1.2.x', 'v1.2.x'] as $branch) {
+            yield $branch.' minor bump' => ['branch' => $branch, 'title' => 'feat: add export', 'current' => 'v1.2.3', 'expected' => 'v1.3.0', 'prerelease' => null, 'dryRun' => false];
+        }
+        yield 'minor branch major bump' => ['branch' => '1.2.x', 'title' => 'fix!: breaking fix', 'current' => 'v1.2.3', 'expected' => 'v2.0.0', 'prerelease' => null, 'dryRun' => false];
+        yield 'prerelease' => ['branch' => '1.2.x', 'title' => 'feat: add export', 'current' => 'v1.2.3', 'expected' => 'v1.3.0-rc.1', 'prerelease' => 'rc', 'dryRun' => false];
+        yield 'dry run' => ['branch' => '1.2.x', 'title' => 'feat: add export', 'current' => 'v1.2.3', 'expected' => 'v1.3.0', 'prerelease' => null, 'dryRun' => true];
+        yield 'initial release' => ['branch' => '1.2.x', 'title' => 'fix: a bug', 'current' => null, 'expected' => 'v0.1.0', 'prerelease' => null, 'dryRun' => false];
+        yield 'initial prerelease' => ['branch' => '1.x', 'title' => 'feat: add export', 'current' => null, 'expected' => 'v0.1.0-beta.1', 'prerelease' => 'beta', 'dryRun' => false];
+    }
+
+    #[DataProvider('incompatibleMaintenanceReleaseProvider')]
+    public function testIncompatibleMaintenanceVersionStopsBeforeWriting(string $branch, string $title, ?string $current, string $expected, ?string $prerelease, bool $dryRun): void
+    {
+        $commits = [['sha' => 'merge1']];
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => $title,
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => $branch],
+                'merge_commit_sha' => 'merge1',
+            ]])),
+            new Response(200, [], $this->json(null === $current ? [] : [['name' => $current, 'commit' => ['sha' => 'tagSha']]])),
+            new Response(200, [], $this->json(null === $current ? $commits : ['commits' => $commits])),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $input = ['--repository' => 'owner/repo', '--branch' => $branch, '--no-edit' => true, '--dry-run' => $dryRun];
+        if (null !== $prerelease) {
+            $input['--prerelease'] = $prerelease;
+        }
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Cannot release version "%s" from maintenance branch "%s"', $expected, $branch));
+        try {
+            $tester->execute($input, ['interactive' => false]);
+        } finally {
+            $this->assertCount(4, $history);
+            foreach ($history as $transaction) {
+                $this->assertSame('GET', $transaction['request']->getMethod());
+            }
+        }
+    }
+
+    /**
+     * @return iterable<string,array{branch:string,title:string,versions:list<string>}>
+     */
+    public static function consecutiveMaintenanceReleaseProvider(): iterable
+    {
+        yield 'major maintenance features' => ['branch' => '1.x', 'title' => 'feat: add export', 'versions' => ['v1.2.3', 'v1.3.0', 'v1.4.0']];
+        yield 'minor maintenance fixes' => ['branch' => 'v1.2.x', 'title' => 'fix: a bug', 'versions' => ['v1.2.3', 'v1.2.4', 'v1.2.5']];
+    }
+
+    /**
+     * @param list<string> $versions
+     */
+    #[DataProvider('consecutiveMaintenanceReleaseProvider')]
+    public function testMaintenanceBranchCanCreateConsecutiveReleases(string $branch, string $title, array $versions): void
+    {
+        $tags = [];
+        $pullRequests = [];
+        foreach ([1, 2] as $number) {
+            $current = $versions[$number - 1];
+            $expected = $versions[$number];
+            $tags[] = ['name' => $current, 'commit' => ['sha' => 'tagSha'.$number]];
+            $pullRequests[] = [
+                'number' => $number, 'user' => ['login' => 'alice'], 'title' => $title.' '.$number,
+                'merged_at' => '2026-01-0'.$number.'T00:00:00Z', 'base' => ['ref' => $branch],
+                'merge_commit_sha' => 'merge'.$number,
+            ];
+            [$guzzleClient, $history] = $this->getGuzzleClient(
+                new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha'.$number]])),
+                new Response(200, [], $this->json($pullRequests)),
+                new Response(200, [], $this->json($tags)),
+                new Response(200, [], $this->json(['commits' => [['sha' => 'merge'.$number]]])),
+                new Response(201, [], $this->json(['sha' => 'newTagSha'])),
+                new Response(201),
+                new Response(201, [], $this->json([
+                    'name' => $expected, 'tag_name' => $expected, 'html_url' => 'url',
+                    'created_at' => '2026-01-03T00:00:00Z',
+                ])),
+            );
+            $tester = new CommandTester($this->createCommand($guzzleClient));
+            $tester->execute(['--repository' => 'owner/repo', '--branch' => $branch, '--no-edit' => true], ['interactive' => false]);
+
+            $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+            $this->assertCount(7, $history);
+            $this->assertSame('/repos/owner/repo/compare/tagSha'.$number.'...branchSha'.$number.'?per_page=100', $history[3]['request']->getRequestTarget());
+            /** @var array{tag:string,message:string} $tagPayload */
+            $tagPayload = json_decode((string) $history[4]['request']->getBody(), true);
+            $this->assertSame($expected, $tagPayload['tag']);
+            $this->assertStringContainsString($title.' '.$number, $tagPayload['message']);
+            if (2 === $number) {
+                $this->assertStringNotContainsString($title.' 1', $tagPayload['message']);
+            }
+        }
+    }
+
+    /**
+     * @return iterable<string,array{prerelease:bool}>
+     */
+    public static function compatibleInitialMaintenanceReleaseProvider(): iterable
+    {
+        yield 'stable' => ['prerelease' => false];
+        yield 'prerelease' => ['prerelease' => true];
+    }
+
+    #[DataProvider('compatibleInitialMaintenanceReleaseProvider')]
+    public function testInitialMaintenanceVersionCanBeConfigured(bool $prerelease): void
+    {
+        $config = new class extends Config {
+            protected function initialVersionString(): string
+            {
+                return 'v1.2.0';
+            }
+        };
+        [$guzzleClient, $history] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => 'feat: add export',
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => '1.2.x'],
+                'merge_commit_sha' => 'merge1',
+            ]])),
+            new Response(200, [], $this->json([])),
+            new Response(200, [], $this->json([['sha' => 'merge1']])),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient, $config));
+        $input = ['--repository' => 'owner/repo', '--branch' => '1.2.x', '--dry-run' => true];
+        if ($prerelease) {
+            $input['--prerelease'] = 'rc';
+        }
+        $tester->execute($input, ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('with tag "v1.2.0'.($prerelease ? '-rc.1' : '').'"', $tester->getDisplay());
+        $this->assertCount(4, $history);
+    }
+
+    public function testCompatibleMaintenancePrereleaseAdvancesSequence(): void
+    {
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => 'fix: a bug',
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => '1.2.x'],
+                'merge_commit_sha' => 'merge1',
+            ]])),
+            new Response(200, [], $this->json([
+                ['name' => 'v1.2.3', 'commit' => ['sha' => 'tagSha']],
+                ['name' => 'v1.2.4-rc.1', 'commit' => ['sha' => 'rcSha']],
+            ])),
+            new Response(200, [], $this->json(['commits' => [['sha' => 'merge1']]])),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient));
+        $tester->execute(['--repository' => 'owner/repo', '--branch' => '1.2.x', '--prerelease' => 'rc', '--dry-run' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('with tag "v1.2.4-rc.2"', $tester->getDisplay());
+    }
+
+    public function testVersionBranchValidationCanBeOverridden(): void
+    {
+        $config = new class extends Config {
+            public function validateVersionForBranch(Branch $branch, Version $version): void
+            {
+                // This configuration uses a custom release-line policy.
+            }
+        };
+        [$guzzleClient] = $this->getGuzzleClient(
+            new Response(200, [], $this->json(['commit' => ['sha' => 'branchSha']])),
+            new Response(200, [], $this->json([[
+                'number' => 1, 'user' => ['login' => 'alice'], 'title' => 'feat!: breaking change',
+                'merged_at' => '2026-01-01T00:00:00Z', 'base' => ['ref' => '1.x'],
+                'merge_commit_sha' => 'merge1',
+            ]])),
+            new Response(200, [], $this->json([['name' => 'v1.2.3', 'commit' => ['sha' => 'tagSha']]])),
+            new Response(200, [], $this->json(['commits' => [['sha' => 'merge1']]])),
+        );
+        $tester = new CommandTester($this->createCommand($guzzleClient, $config));
+        $tester->execute(['--repository' => 'owner/repo', '--branch' => '1.x', '--dry-run' => true], ['interactive' => false]);
+
+        $this->assertSame(CreateRelease::SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('with tag "v2.0.0"', $tester->getDisplay());
+    }
 
     /**
      * @return iterable<string,array{initialRelease:bool,expectedVersion:string}>
