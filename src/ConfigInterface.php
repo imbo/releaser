@@ -2,6 +2,7 @@
 
 namespace ImboReleaser;
 
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\ReleasePullRequest;
 use ImboReleaser\GitHub\ReleaseTag;
@@ -52,6 +53,17 @@ interface ConfigInterface
      * @param list<ReleasePullRequest> $pullRequests
      */
     public function determineNextVersion(ReleaseTag $currentTag, array $pullRequests): Version;
+
+    /**
+     * Reject a version that is incompatible with the selected branch's release line.
+     *
+     * Called for initial releases, subsequent releases, and prereleases, including dry runs. Return
+     * normally to accept the version, or throw RuntimeException with an actionable message to
+     * reject it and stop release creation before any tag or release is created.
+     *
+     * @throws RuntimeException if the version is incompatible with the branch's release line
+     */
+    public function validateVersionForBranch(Branch $branch, Version $version): void;
 
     /**
      * Get the latest version for a given branch.

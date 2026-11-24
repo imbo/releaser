@@ -246,6 +246,8 @@ class CreateRelease extends BaseCommand
             $nextVersion = $this->nextPrereleaseVersion($nextVersion, $prereleaseIdentifier, $allTags);
         }
 
+        $this->config->validateVersionForBranch($branch, $nextVersion);
+
         foreach ($allTags as $tag) {
             if ($tag->name === (string) $nextVersion) {
                 throw new RuntimeException(sprintf('Tag "%s" already exists in repository "%s".', $nextVersion, $repository));

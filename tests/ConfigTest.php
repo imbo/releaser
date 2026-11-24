@@ -4,6 +4,7 @@ namespace ImboReleaser;
 
 use DateTimeImmutable;
 use ImboReleaser\Exception\InvalidArgumentException;
+use ImboReleaser\Exception\RuntimeException;
 use ImboReleaser\GitHub\Branch;
 use ImboReleaser\GitHub\PullRequest;
 use ImboReleaser\GitHub\ReleasePullRequest;
@@ -12,6 +13,10 @@ use ImboReleaser\GitHub\User;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+
+use function sprintf;
+
+use const PHP_INT_MAX;
 
 #[CoversClass(Config::class)]
 class ConfigTest extends TestCase
@@ -187,6 +192,82 @@ class ConfigTest extends TestCase
             array_map(static fn (string $title) => ReleasePullRequest::fromPullRequest(new PullRequest(123, new User('login'), new DateTimeImmutable(), $title, 'main')), $titles),
         );
         $this->assertSame($expected, (string) $next);
+    }
+
+    /**
+     * @return iterable<string,array{branch:string,version:string,allowed:bool}>
+     */
+    public static function versionBranchCompatibilityProvider(): iterable
+    {
+        foreach (['1', 'v1', '1.x', 'v1.x'] as $branch) {
+            yield $branch.' compatible feature' => ['branch' => $branch, 'version' => 'v1.3.0', 'allowed' => true];
+            yield $branch.' incompatible major' => ['branch' => $branch, 'version' => 'v2.0.0', 'allowed' => false];
+            yield $branch.' lower major' => ['branch' => $branch, 'version' => 'v0.9.9', 'allowed' => false];
+        }
+        foreach (['1.2', 'v1.2', '1.2.x', 'v1.2.x'] as $branch) {
+            yield $branch.' compatible patch' => ['branch' => $branch, 'version' => 'v1.2.4', 'allowed' => true];
+            yield $branch.' incompatible minor' => ['branch' => $branch, 'version' => 'v1.3.0', 'allowed' => false];
+            yield $branch.' lower minor' => ['branch' => $branch, 'version' => 'v1.1.9', 'allowed' => false];
+        }
+        yield 'main unrestricted' => ['branch' => 'main', 'version' => 'v2.0.0', 'allowed' => true];
+        yield 'master unrestricted' => ['branch' => 'master', 'version' => 'v2.0.0', 'allowed' => true];
+        yield 'custom name unrestricted' => ['branch' => 'release/current', 'version' => 'v2.0.0', 'allowed' => true];
+        yield 'zero major' => ['branch' => '0.x', 'version' => 'v0.2.0', 'allowed' => true];
+        yield 'zero minor' => ['branch' => '1.0.x', 'version' => 'v1.0.1', 'allowed' => true];
+        yield 'custom tag prefix' => ['branch' => '1.2.x', 'version' => 'release-1.2.4', 'allowed' => true];
+        yield 'custom tag prefix outside release line' => ['branch' => '1.2.x', 'version' => 'release-1.3.0', 'allowed' => false];
+        yield 'compatible prerelease and metadata' => ['branch' => '1.2.x', 'version' => 'v1.2.4-rc.1+build.2', 'allowed' => true];
+        yield 'incompatible prerelease' => ['branch' => '1.2.x', 'version' => 'v1.3.0-rc.1', 'allowed' => false];
+        yield 'different major with same prefix' => ['branch' => '1.x', 'version' => 'v10.0.0', 'allowed' => false];
+        yield 'different minor with same prefix' => ['branch' => '1.2.x', 'version' => 'v1.20.0', 'allowed' => false];
+        yield 'maximum major' => ['branch' => PHP_INT_MAX.'.x', 'version' => 'v'.PHP_INT_MAX.'.0.0', 'allowed' => true];
+        yield 'maximum minor' => ['branch' => '1.'.PHP_INT_MAX.'.x', 'version' => 'v1.'.PHP_INT_MAX.'.0', 'allowed' => true];
+        yield 'maximum patch' => ['branch' => '1.2.x', 'version' => 'v1.2.'.PHP_INT_MAX, 'allowed' => true];
+    }
+
+    #[DataProvider('versionBranchCompatibilityProvider')]
+    public function testValidateVersionForBranch(string $branch, string $version, bool $allowed): void
+    {
+        if ($allowed) {
+            $this->expectNotToPerformAssertions();
+        } else {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage(sprintf('Cannot release version "%s" from maintenance branch "%s"', $version, $branch));
+        }
+
+        (new Config())->validateVersionForBranch(new Branch($branch), Version::fromString($version));
+    }
+
+    public function testConfiguredMainBranchIsNotBoundedByItsName(): void
+    {
+        $config = new class extends Config {
+            protected function mainBranchNames(): array
+            {
+                return [...parent::mainBranchNames(), '1.x'];
+            }
+        };
+
+        $this->expectNotToPerformAssertions();
+        $config->validateVersionForBranch(new Branch('1.x'), Version::fromString('v2.0.0'));
+    }
+
+    /**
+     * @return iterable<string,array{branch:string}>
+     */
+    public static function unsupportedMaintenanceVersionLineProvider(): iterable
+    {
+        yield 'leading zero major' => ['branch' => '01.x'];
+        yield 'leading zero minor' => ['branch' => '1.02.x'];
+        yield 'overflowing major' => ['branch' => PHP_INT_MAX.'0.x'];
+        yield 'overflowing minor' => ['branch' => '1.'.PHP_INT_MAX.'0.x'];
+    }
+
+    #[DataProvider('unsupportedMaintenanceVersionLineProvider')]
+    public function testRejectsUnsupportedMaintenanceVersionLine(string $branch): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(sprintf('Maintenance branch "%s" does not name a supported version line.', $branch));
+        (new Config())->validateVersionForBranch(new Branch($branch), Version::fromString('v1.2.3'));
     }
 
     /**
